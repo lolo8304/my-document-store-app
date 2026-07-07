@@ -5,7 +5,6 @@ import { SearchType } from '../api';
 interface SearchHeaderProps {
   query: string;
   type: SearchType;
-  loading: boolean;
   latestLoading: boolean;
   syncLoading: boolean;
   stopSyncLoading: boolean;
@@ -30,7 +29,6 @@ interface SearchHeaderProps {
 export function SearchHeader({
   query,
   type,
-  loading,
   latestLoading,
   syncLoading,
   stopSyncLoading,
@@ -83,20 +81,19 @@ export function SearchHeader({
 
   return (
     <section className="border-b border-stone-200 bg-white">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
         <div>
-          <h1 className="text-5xl font-semibold tracking-normal">my-document-store</h1>
-          <p className="mt-3 text-xl text-stone-600">Search scanned documents from Dropbox.</p>
+          <h1 className="text-3xl font-semibold tracking-normal sm:text-5xl">Hänggi document search</h1>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex h-16 min-w-0 flex-1 items-center gap-4 rounded border border-stone-300 bg-white px-4 shadow-sm focus-within:border-stone-900">
-              <Search className="h-7 w-7 shrink-0 text-stone-500" aria-hidden="true" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-16 min-w-0 flex-1 items-center gap-2 rounded border border-stone-300 bg-white px-2 shadow-sm focus-within:border-stone-900 sm:gap-4 sm:px-4">
+              <Search className="h-6 w-6 shrink-0 text-stone-500 sm:h-7 sm:w-7" aria-hidden="true" />
               <input
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
-                className="h-14 min-w-0 flex-1 bg-transparent text-2xl outline-none"
+                className="h-14 min-w-0 flex-1 bg-transparent text-lg outline-none sm:text-2xl"
                 placeholder="Search documents"
                 autoFocus
               />
@@ -106,60 +103,50 @@ export function SearchHeader({
                   title="Clear search"
                   aria-label="Clear search"
                   onClick={() => onQueryChange('')}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded text-stone-500 hover:bg-stone-100 hover:text-stone-900"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-stone-500 hover:bg-stone-100 hover:text-stone-900 sm:h-10 sm:w-10"
                 >
-                  <X className="h-6 w-6" aria-hidden="true" />
+                  <X className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
                 </button>
               )}
             </div>
 
-            <div className="ml-auto flex shrink-0 items-center justify-end gap-3">
-              {vectorSearchEnabled && (
-                <div className="grid h-16 grid-cols-2 rounded border border-stone-300 bg-white p-1 shadow-sm">
-                  <button
-                    type="button"
-                    title="Keyword search"
-                    aria-label="Keyword search"
-                    onClick={() => onTypeChange('query')}
-                    className={`flex h-14 w-16 items-center justify-center rounded-sm ${
-                      type === 'query' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'
-                    }`}
-                  >
-                    <FileText className="h-7 w-7" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Question search"
-                    aria-label="Question search"
-                    onClick={() => onTypeChange('question')}
-                    className={`flex h-14 w-16 items-center justify-center rounded-sm ${
-                      type === 'question' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'
-                    }`}
-                  >
-                    <Brain className="h-7 w-7" aria-hidden="true" />
-                  </button>
-                </div>
-              )}
+            {vectorSearchEnabled && (
+              <div className="grid h-16 grid-cols-2 rounded border border-stone-300 bg-white p-1 shadow-sm sm:justify-self-end">
+                <button
+                  type="button"
+                  title="Keyword search"
+                  aria-label="Keyword search"
+                  onClick={() => onTypeChange('query')}
+                  className={`flex h-14 w-16 items-center justify-center rounded-sm ${
+                    type === 'query' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'
+                  }`}
+                >
+                  <FileText className="h-7 w-7" aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  title="Question search"
+                  aria-label="Question search"
+                  onClick={() => onTypeChange('question')}
+                  className={`flex h-14 w-16 items-center justify-center rounded-sm ${
+                    type === 'question' ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'
+                  }`}
+                >
+                  <Brain className="h-7 w-7" aria-hidden="true" />
+                </button>
+              </div>
+            )}
 
-              <button
-                type="submit"
-                className="h-16 rounded bg-stone-900 px-8 text-xl font-medium text-white hover:bg-stone-700 disabled:cursor-not-allowed disabled:bg-stone-400 sm:min-w-36"
-                disabled={loading}
-              >
-                {loading ? 'Searching' : 'Search'}
-              </button>
-
-              <button
-                type="button"
-                title="Sync Dropbox"
-                aria-label="Sync Dropbox"
-                onClick={onSync}
-                disabled={syncLoading || syncProgress?.running}
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
-              >
-                <RefreshCw className={`h-7 w-7 ${syncLoading || syncProgress?.running ? 'animate-spin' : ''}`} aria-hidden="true" />
-              </button>
-            </div>
+            <button
+              type="button"
+              title="Sync Dropbox"
+              aria-label="Sync Dropbox"
+              onClick={onSync}
+              disabled={syncLoading || syncProgress?.running}
+              className="flex h-16 w-16 shrink-0 items-center justify-center rounded border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300 sm:justify-self-end"
+            >
+              <RefreshCw className={`h-7 w-7 ${syncLoading || syncProgress?.running ? 'animate-spin' : ''}`} aria-hidden="true" />
+            </button>
           </div>
 
           <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 text-base text-stone-600">

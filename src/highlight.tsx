@@ -12,7 +12,7 @@ export function HighlightedText({ text, terms }: { text: string; terms: string[]
       {text.split(pattern).map((part, index) => {
         const matched = safeTerms.some((term) => term.toLowerCase() === part.toLowerCase());
         return matched ? (
-          <mark key={`${part}-${index}`} className="rounded bg-amber-200 px-0.5 text-stone-950">
+          <mark key={`${part}-${index}`} className="bg-amber-200 text-stone-950">
             {part}
           </mark>
         ) : (

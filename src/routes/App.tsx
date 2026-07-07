@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FileDown, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getLatestDocuments, getSettings, searchDocuments, SearchResult, SearchType, stopDropboxSync, syncDropbox } from '../api';
 import { SearchHeader } from '../components/SearchHeader';
@@ -179,7 +180,6 @@ export default function App() {
       <SearchHeader
         query={query}
         type={type}
-        loading={loading}
         latestLoading={latestLoading}
         syncLoading={syncLoading}
         stopSyncLoading={stopSyncLoading}
@@ -193,11 +193,11 @@ export default function App() {
         onStopSync={() => void runStopSync()}
       />
 
-      <section className="mx-auto w-full max-w-5xl px-4 py-6">
-        {error && <div className="rounded border border-red-200 bg-red-50 px-5 py-4 text-lg text-red-800">{error}</div>}
+      <section className="mx-auto w-full max-w-5xl">
+        {error && <div className="rounded border border-red-200 bg-red-50 p-4 text-lg text-red-800">{error}</div>}
 
         {result && (
-          <div className="mb-4 flex items-center justify-between text-lg text-stone-600">
+          <div className="flex items-center justify-between p-4 text-lg text-stone-600">
             <span>
               {result.total} result{result.total === 1 ? '' : 's'}
             </span>
@@ -209,27 +209,37 @@ export default function App() {
 
         <div className="divide-y divide-stone-200 border-y border-stone-200 bg-white">
           {result?.items.map((item) => (
-            <article key={item.documentId} className="px-4 py-5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex flex-wrap items-baseline gap-3">
-                    <h2 className="text-2xl font-semibold">{item.fileName}</h2>
-                    {item.language && <span className="text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
+            <article key={item.documentId} className="p-4">
+              <div>
+                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
+                  <h2 className="min-w-0 flex-1 text-xl font-semibold">{item.fileName}</h2>
+                  {item.language && <span className="shrink-0 text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
+                  <div className="flex shrink-0 justify-end gap-2">
+                    {item.pdfUrl && (
+                      <a
+                        className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                        href={item.pdfUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Open PDF"
+                        aria-label={`Open PDF for ${item.fileName}`}
+                      >
+                        <FileDown className="h-5 w-5" aria-hidden="true" />
+                      </a>
+                    )}
+                    <Link
+                      className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                      to={`/documents/${item.documentId}/text`}
+                      title="Open text"
+                      aria-label={`Open text for ${item.fileName}`}
+                    >
+                      <FileText className="h-5 w-5" aria-hidden="true" />
+                    </Link>
                   </div>
-                  <p className="mt-1 text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
                 </div>
-                <div className="flex shrink-0 gap-4 text-lg">
-                  <Link className="font-medium text-blue-700 hover:text-blue-900" to={`/documents/${item.documentId}/text`}>
-                    Text
-                  </Link>
-                  {item.pdfUrl && (
-                    <a className="font-medium text-blue-700 hover:text-blue-900" href={item.pdfUrl} target="_blank" rel="noreferrer">
-                      PDF
-                    </a>
-                  )}
-                </div>
+                <p className="mt-1 text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
               </div>
-              <p className="mt-4 max-w-4xl text-xl leading-8 text-stone-700">
+              <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
                 <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
               </p>
             </article>

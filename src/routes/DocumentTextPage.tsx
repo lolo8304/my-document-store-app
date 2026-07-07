@@ -18,7 +18,6 @@ export default function DocumentTextPage() {
   const [text, setText] = useState('');
   const [pdfUrl, setPdfUrl] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
-  const [searchLoading, setSearchLoading] = useState(false);
   const [latestLoading, setLatestLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [stopSyncLoading, setStopSyncLoading] = useState(false);
@@ -98,7 +97,6 @@ export default function DocumentTextPage() {
       return;
     }
 
-    setSearchLoading(true);
     setError(undefined);
     try {
       const effectiveType = vectorSearchEnabled ? type : 'query';
@@ -112,8 +110,6 @@ export default function DocumentTextPage() {
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
-    } finally {
-      setSearchLoading(false);
     }
   }
 
@@ -172,7 +168,6 @@ export default function DocumentTextPage() {
       <SearchHeader
         query={query}
         type={type}
-        loading={searchLoading}
         latestLoading={latestLoading}
         syncLoading={syncLoading}
         stopSyncLoading={stopSyncLoading}
@@ -186,7 +181,7 @@ export default function DocumentTextPage() {
         onStopSync={() => void runStopSync()}
       />
 
-      <section className="mx-auto w-full max-w-5xl px-4 py-6">
+      <section className="mx-auto w-full max-w-5xl p-4">
         <div className="mb-4 flex items-center justify-between">
           <Link className="flex items-center gap-2 text-lg font-medium text-stone-700 hover:text-stone-950" to="/">
             <ArrowLeft className="h-4 w-4" />
@@ -200,9 +195,9 @@ export default function DocumentTextPage() {
           )}
         </div>
         {loading && <div className="text-lg text-stone-600">Loading document text</div>}
-        {error && <div className="rounded border border-red-200 bg-red-50 px-5 py-4 text-lg text-red-800">{error}</div>}
+        {error && <div className="rounded border border-red-200 bg-red-50 p-4 text-lg text-red-800">{error}</div>}
         {!loading && !error && (
-          <pre className="whitespace-pre-wrap border-y border-stone-200 bg-white px-5 py-6 font-mono text-xl leading-8 text-stone-800">
+          <pre className="whitespace-pre-wrap border-y border-stone-200 bg-white p-4 font-mono text-xl leading-8 text-stone-800">
             {text}
           </pre>
         )}

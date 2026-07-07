@@ -8,7 +8,7 @@ export function Toast({ message }: ToastProps) {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 max-w-md rounded border border-emerald-200 bg-emerald-50 px-5 py-4 text-lg text-emerald-900 shadow-lg">
+    <div className="fixed bottom-4 right-4 z-50 max-w-md rounded border border-emerald-200 bg-emerald-50 p-4 text-lg text-emerald-900 shadow-lg">
       {message}
     </div>
   );
