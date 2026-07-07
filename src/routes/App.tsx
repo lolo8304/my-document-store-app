@@ -3,7 +3,6 @@ import { FileDown, FileText } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getLatestDocuments, getSettings, searchDocuments, SearchResult, SearchType, stopDropboxSync, syncDropbox } from '../api';
 import { SearchHeader } from '../components/SearchHeader';
-import { Toast } from '../components/Toast';
 import { HighlightedText } from '../highlight';
 import { clearPersistedSearchState, readPersistedSearchState, writePersistedSearchState } from '../searchState';
 import { useSyncProgress } from '../useSyncProgress';
@@ -24,7 +23,6 @@ export default function App() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [stopSyncLoading, setStopSyncLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const [statusMessage, setStatusMessage] = useState<string | undefined>();
   const [vectorSearchEnabled, setVectorSearchEnabled] = useState(false);
   const loadingMoreRef = useRef(false);
   const syncProgress = useSyncProgress();
@@ -51,15 +49,6 @@ export default function App() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!statusMessage) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setStatusMessage(undefined), 10000);
-    return () => window.clearTimeout(timeout);
-  }, [statusMessage]);
-
   const runSearch = useCallback(async (nextPage = 1, append = false) => {
     if (!query.trim()) {
       setResult(undefined);
@@ -74,7 +63,6 @@ export default function App() {
       setLoading(true);
     }
     setError(undefined);
-    setStatusMessage(undefined);
     try {
       const effectiveType = vectorSearchEnabled ? type : 'query';
       const response = await searchDocuments(query.trim(), effectiveType, nextPage, searchPageSize);
@@ -103,10 +91,8 @@ export default function App() {
   async function runSync() {
     setSyncLoading(true);
     setError(undefined);
-    setStatusMessage(undefined);
     try {
       await syncDropbox();
-      setStatusMessage('Sync started. Check the status icon for progress.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
@@ -117,7 +103,6 @@ export default function App() {
   async function runLatest(limit: 1 | 2 | 10) {
     setLatestLoading(true);
     setError(undefined);
-    setStatusMessage(undefined);
     try {
       const response = await getLatestDocuments(limit);
       const latestResult = { ...response, total: response.items.length };
@@ -143,10 +128,8 @@ export default function App() {
   async function runStopSync() {
     setStopSyncLoading(true);
     setError(undefined);
-    setStatusMessage(undefined);
     try {
       await stopDropboxSync();
-      setStatusMessage('Sync stop requested. Check the status icon for progress.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not stop sync');
     } finally {
@@ -162,7 +145,6 @@ export default function App() {
     setResult(undefined);
     setResultQuery('');
     setError(undefined);
-    setStatusMessage(undefined);
     navigate('/');
   }
 
@@ -292,7 +274,6 @@ export default function App() {
         <div id="search-scroll-sentinel" className="h-10" />
         {loadingMore && <div className="mt-3 text-center text-lg text-stone-500">Loading more results</div>}
       </section>
-      <Toast message={statusMessage} />
     </main>
   );
 }

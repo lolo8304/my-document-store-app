@@ -50,6 +50,7 @@ export function SearchHeader({
     receivedAt: Date.now(),
   });
   const [now, setNow] = useState(Date.now());
+  const [hideCompletedStatus, setHideCompletedStatus] = useState(false);
 
   useEffect(() => {
     setElapsedBaseline({
@@ -68,6 +69,17 @@ export function SearchHeader({
     const interval = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(interval);
   }, [syncProgress?.running, syncProgress?.fileElapsedSeconds]);
+
+  useEffect(() => {
+    if (syncProgress?.status !== 'completed') {
+      setHideCompletedStatus(false);
+      return;
+    }
+
+    setHideCompletedStatus(false);
+    const timeout = window.setTimeout(() => setHideCompletedStatus(true), 10000);
+    return () => window.clearTimeout(timeout);
+  }, [syncProgress?.status]);
 
   const displayedFileElapsedSeconds =
     syncProgress?.running &&
@@ -168,33 +180,35 @@ export function SearchHeader({
           </div>
 
           <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 text-base text-stone-600">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => onLatest(1)}
-                disabled={latestLoading}
-                className="h-8 rounded border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
-              >
-                last
-              </button>
-              <button
-                type="button"
-                onClick={() => onLatest(2)}
-                disabled={latestLoading}
-                className="h-8 rounded border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
-              >
-                2
-              </button>
-              <button
-                type="button"
-                onClick={() => onLatest(10)}
-                disabled={latestLoading}
-                className="h-8 rounded border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
-              >
-                10
-              </button>
-            </div>
-            <span>{syncStatusText(syncProgress, syncLoading)}</span>
+            {!syncProgress?.running && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onLatest(1)}
+                  disabled={latestLoading}
+                  className="h-8 rounded border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
+                >
+                  last
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onLatest(2)}
+                  disabled={latestLoading}
+                  className="h-8 rounded border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
+                >
+                  2
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onLatest(10)}
+                  disabled={latestLoading}
+                  className="h-8 rounded border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
+                >
+                  10
+                </button>
+              </div>
+            )}
+            <span>{syncStatusText(syncProgress, syncLoading, hideCompletedStatus)}</span>
             {syncProgress?.running && syncProgress.total > 0 && (
               <span className="tabular-nums">
                 {syncProgress.current} / {syncProgress.total}
@@ -242,12 +256,12 @@ function phaseLabel(phase: string) {
   return labels[phase] ?? phase;
 }
 
-function syncStatusText(syncProgress: SearchHeaderProps['syncProgress'], syncLoading: boolean) {
+function syncStatusText(syncProgress: SearchHeaderProps['syncProgress'], syncLoading: boolean, hideCompletedStatus: boolean) {
   if (syncLoading) {
     return 'Sync starting';
   }
 
-  if (!syncProgress || syncProgress.status === 'idle') {
+  if (!syncProgress || syncProgress.status === 'idle' || (syncProgress.status === 'completed' && hideCompletedStatus)) {
     return 'Sync idle';
   }
 
