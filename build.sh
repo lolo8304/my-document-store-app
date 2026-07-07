@@ -12,7 +12,7 @@ HOST_API_PORT="${HOST_API_PORT:-3000}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
 BUILD_IMAGE=true
 START_ONLY=false
-ENDPOINT_OVERRIDE=""
+ENDPOINT_OVERRIDE="http://192.168.1.107:3000"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -116,6 +116,8 @@ echo "Using API env: ${API_ENV_FILE}"
 echo "Replacing container ${CONTAINER_NAME}"
 docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
 
+docker save -o my-document-store.tar my-document-store:latest
+
 echo "Starting ${CONTAINER_NAME}"
 docker run -d \
   --name "${CONTAINER_NAME}" \
@@ -130,4 +132,3 @@ echo "Started ${CONTAINER_NAME}"
 echo "App: http://localhost:${HOST_APP_PORT}"
 echo "API: http://localhost:${HOST_API_PORT}"
 
-docker save -o my-document-store.tar my-document-store:latest
