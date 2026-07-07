@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileDown, FileText } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getLatestDocuments, getSettings, searchDocuments, SearchResult, SearchType, stopDropboxSync, syncDropbox } from '../api';
 import { SearchHeader } from '../components/SearchHeader';
 import { Toast } from '../components/Toast';
@@ -11,6 +11,7 @@ import { useSyncProgress } from '../useSyncProgress';
 const searchPageSize = 10;
 
 export default function App() {
+  const navigate = useNavigate();
   const persistedSearch = readPersistedSearchState();
   const [query, setQuery] = useState(persistedSearch?.query ?? '');
   const [type, setType] = useState<SearchType>(persistedSearch?.type ?? 'query');
@@ -209,7 +210,19 @@ export default function App() {
 
         <div className="divide-y divide-stone-200 border-y border-stone-200 bg-white">
           {result?.items.map((item) => (
-            <article key={item.documentId} className="p-4">
+            <article
+              key={item.documentId}
+              role="link"
+              tabIndex={0}
+              onClick={() => navigate(`/documents/${item.documentId}/text`)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  navigate(`/documents/${item.documentId}/text`);
+                }
+              }}
+              className="cursor-pointer p-4 hover:bg-stone-50"
+            >
               <div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
                   <h2 className="min-w-0 flex-1 text-xl font-semibold">{item.fileName}</h2>
@@ -223,6 +236,7 @@ export default function App() {
                         rel="noreferrer"
                         title="Open PDF"
                         aria-label={`Open PDF for ${item.fileName}`}
+                        onClick={(event) => event.stopPropagation()}
                       >
                         <FileDown className="h-5 w-5" aria-hidden="true" />
                       </a>
@@ -232,12 +246,22 @@ export default function App() {
                       to={`/documents/${item.documentId}/text`}
                       title="Open text"
                       aria-label={`Open text for ${item.fileName}`}
+                      onClick={(event) => event.stopPropagation()}
                     >
                       <FileText className="h-5 w-5" aria-hidden="true" />
                     </Link>
                   </div>
                 </div>
                 <p className="mt-1 text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
+                {missingTerms(query, item.matchedTerms).length > 0 && (
+                  <p className="mt-1 text-sm text-stone-400">
+                    {missingTerms(query, item.matchedTerms).map((term) => (
+                      <span key={term} className="mr-2 line-through">
+                        {term}
+                      </span>
+                    ))}
+                  </p>
+                )}
               </div>
               <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
                 <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
@@ -251,6 +275,27 @@ export default function App() {
       </section>
       <Toast message={statusMessage} />
     </main>
+  );
+}
+
+function missingTerms(query: string, matchedTerms: string[]) {
+  const terms = normalizeQueryTerms(query);
+  if (terms.length <= 1) {
+    return [];
+  }
+  const matched = new Set(matchedTerms.map((term) => term.toLowerCase()));
+  return terms.filter((term) => !matched.has(term));
+}
+
+function normalizeQueryTerms(input: string) {
+  return Array.from(
+    new Set(
+      input
+        .toLowerCase()
+        .split(/[^\p{L}\p{N}]+/u)
+        .map((term) => term.trim())
+        .filter((term) => term.length > 1 && term !== 'last'),
+    ),
   );
 }
 
