@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Brain, FileText, RefreshCw, Search, Square, X } from 'lucide-react';
 import { SearchType } from '../api';
 
@@ -22,6 +22,7 @@ interface SearchHeaderProps {
   onTypeChange: (type: SearchType) => void;
   onSubmit: () => void;
   onLatest: (limit: 1 | 2 | 10) => void;
+  onReset: () => void;
   onSync: () => void;
   onStopSync: () => void;
 }
@@ -38,9 +39,11 @@ export function SearchHeader({
   onTypeChange,
   onSubmit,
   onLatest,
+  onReset,
   onSync,
   onStopSync,
 }: SearchHeaderProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
   const [elapsedBaseline, setElapsedBaseline] = useState({
     fileName: undefined as string | undefined,
     seconds: undefined as number | undefined,
@@ -79,11 +82,22 @@ export function SearchHeader({
     onSubmit();
   }
 
+  function handleReset() {
+    onReset();
+    window.requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
   return (
     <section className="border-b border-stone-200 bg-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
         <div>
-          <h1 className="text-3xl font-semibold tracking-normal sm:text-5xl">Hänggi document search</h1>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="text-left text-3xl font-semibold tracking-normal hover:text-stone-700 sm:text-5xl"
+          >
+            Hänggi document search
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -91,6 +105,7 @@ export function SearchHeader({
             <div className="flex h-16 min-w-0 flex-1 items-center gap-2 rounded border border-stone-300 bg-white px-2 shadow-sm focus-within:border-stone-900 sm:gap-4 sm:px-4">
               <Search className="h-6 w-6 shrink-0 text-stone-500 sm:h-7 sm:w-7" aria-hidden="true" />
               <input
+                ref={inputRef}
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
                 className="h-14 min-w-0 flex-1 bg-transparent text-lg outline-none sm:text-2xl"
@@ -102,7 +117,10 @@ export function SearchHeader({
                   type="button"
                   title="Clear search"
                   aria-label="Clear search"
-                  onClick={() => onQueryChange('')}
+                  onClick={() => {
+                    onQueryChange('');
+                    window.requestAnimationFrame(() => inputRef.current?.focus());
+                  }}
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded text-stone-500 hover:bg-stone-100 hover:text-stone-900 sm:h-10 sm:w-10"
                 >
                   <X className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />

@@ -165,6 +165,15 @@ export default function DocumentTextPage() {
     }
   }
 
+  function resetSearch() {
+    clearPersistedSearchState();
+    setQuery('');
+    setType('query');
+    setError(undefined);
+    setStatusMessage(undefined);
+    navigate('/');
+  }
+
   return (
     <main className="min-h-screen bg-stone-50 text-stone-950">
       <SearchHeader
@@ -179,6 +188,7 @@ export default function DocumentTextPage() {
         onTypeChange={setType}
         onSubmit={() => void runSearch()}
         onLatest={(limit) => void runLatest(limit)}
+        onReset={resetSearch}
         onSync={() => void runSync()}
         onStopSync={() => void runStopSync()}
       />

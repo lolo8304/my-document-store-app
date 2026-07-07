@@ -17,6 +17,7 @@ export default function App() {
   const [type, setType] = useState<SearchType>(persistedSearch?.type ?? 'query');
   const [page, setPage] = useState(persistedSearch?.page ?? 1);
   const [result, setResult] = useState<SearchResult | undefined>(persistedSearch?.result);
+  const [resultQuery, setResultQuery] = useState(persistedSearch?.query ?? '');
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [latestLoading, setLatestLoading] = useState(false);
@@ -79,6 +80,7 @@ export default function App() {
       const response = await searchDocuments(query.trim(), effectiveType, nextPage, searchPageSize);
       const nextResult = append && result ? { ...response, items: [...result.items, ...response.items] } : response;
       setResult(nextResult);
+      setResultQuery(query.trim());
       setPage(nextPage);
       writePersistedSearchState({
         query: query.trim(),
@@ -119,9 +121,10 @@ export default function App() {
     try {
       const response = await getLatestDocuments(limit);
       const latestResult = { ...response, total: response.items.length };
-      setResult(latestResult);
-      setPage(1);
       const nextQuery = limit === 1 ? 'last' : `last ${limit}`;
+      setResult(latestResult);
+      setResultQuery(nextQuery);
+      setPage(1);
       setQuery(nextQuery);
       setType('query');
       writePersistedSearchState({
@@ -149,6 +152,18 @@ export default function App() {
     } finally {
       setStopSyncLoading(false);
     }
+  }
+
+  function resetSearch() {
+    clearPersistedSearchState();
+    setQuery('');
+    setType('query');
+    setPage(1);
+    setResult(undefined);
+    setResultQuery('');
+    setError(undefined);
+    setStatusMessage(undefined);
+    navigate('/');
   }
 
   const hasMoreResults = result ? result.items.length < result.total : false;
@@ -190,6 +205,7 @@ export default function App() {
         onTypeChange={setType}
         onSubmit={() => void runSearch(1)}
         onLatest={(limit) => void runLatest(limit)}
+        onReset={resetSearch}
         onSync={() => void runSync()}
         onStopSync={() => void runStopSync()}
       />
@@ -209,65 +225,68 @@ export default function App() {
         )}
 
         <div className="divide-y divide-stone-200 border-y border-stone-200 bg-white">
-          {result?.items.map((item) => (
-            <article
-              key={item.documentId}
-              role="link"
-              tabIndex={0}
-              onClick={() => navigate(`/documents/${item.documentId}/text`)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  navigate(`/documents/${item.documentId}/text`);
-                }
-              }}
-              className="cursor-pointer p-4 hover:bg-stone-50"
-            >
-              <div>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
-                  <h2 className="min-w-0 flex-1 text-xl font-semibold">{item.fileName}</h2>
-                  {item.language && <span className="shrink-0 text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
-                  <div className="flex shrink-0 justify-end gap-2">
-                    {item.pdfUrl && (
-                      <a
+          {result?.items.map((item) => {
+            const itemMissingTerms = missingTerms(resultQuery, item.matchedTerms);
+            return (
+              <article
+                key={item.documentId}
+                role="link"
+                tabIndex={0}
+                onClick={() => navigate(`/documents/${item.documentId}/text`)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    navigate(`/documents/${item.documentId}/text`);
+                  }
+                }}
+                className="cursor-pointer p-4 hover:bg-stone-50"
+              >
+                <div>
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
+                    <h2 className="min-w-0 flex-1 text-xl font-semibold">{item.fileName}</h2>
+                    {item.language && <span className="shrink-0 text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
+                    <div className="flex shrink-0 justify-end gap-2">
+                      {item.pdfUrl && (
+                        <a
+                          className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                          href={item.pdfUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Open PDF"
+                          aria-label={`Open PDF for ${item.fileName}`}
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <FileDown className="h-5 w-5" aria-hidden="true" />
+                        </a>
+                      )}
+                      <Link
                         className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
-                        href={item.pdfUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Open PDF"
-                        aria-label={`Open PDF for ${item.fileName}`}
+                        to={`/documents/${item.documentId}/text`}
+                        title="Open text"
+                        aria-label={`Open text for ${item.fileName}`}
                         onClick={(event) => event.stopPropagation()}
                       >
-                        <FileDown className="h-5 w-5" aria-hidden="true" />
-                      </a>
-                    )}
-                    <Link
-                      className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
-                      to={`/documents/${item.documentId}/text`}
-                      title="Open text"
-                      aria-label={`Open text for ${item.fileName}`}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <FileText className="h-5 w-5" aria-hidden="true" />
-                    </Link>
+                        <FileText className="h-5 w-5" aria-hidden="true" />
+                      </Link>
+                    </div>
                   </div>
+                  <p className="mt-1 text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
+                  {itemMissingTerms.length > 0 && (
+                    <p className="mt-1 text-sm text-stone-400">
+                      {itemMissingTerms.map((term) => (
+                        <span key={term} className="mr-2 line-through">
+                          {term}
+                        </span>
+                      ))}
+                    </p>
+                  )}
                 </div>
-                <p className="mt-1 text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
-                {missingTerms(query, item.matchedTerms).length > 0 && (
-                  <p className="mt-1 text-sm text-stone-400">
-                    {missingTerms(query, item.matchedTerms).map((term) => (
-                      <span key={term} className="mr-2 line-through">
-                        {term}
-                      </span>
-                    ))}
-                  </p>
-                )}
-              </div>
-              <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
-                <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
-              </p>
-            </article>
-          ))}
+                <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
+                  <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
+                </p>
+              </article>
+            );
+          })}
         </div>
 
         <div id="search-scroll-sentinel" className="h-10" />
