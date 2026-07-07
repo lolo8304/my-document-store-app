@@ -1,0 +1,39 @@
+services:
+  my-document-store:
+    build:
+      context: ..
+      dockerfile: my-document-store-app/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://192.168.1.107:3000
+    env_file:
+      - ../my-document-store-api/.env
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_CORS_ORIGIN: http://192.168.1.107:3001
+      OCR_LANGUAGES: deu+eng+fra
+      MY_DOCUMENT_STORE_API_KEY: replace
+      MONGODB_URI: replace
+      MONGODB_DB_NAME: my-document-store-local
+      DROPBOX_BASE_LOCATION: /localhost
+      DROPBOX_ACCESS_TOKEN: replace
+      DROPBOX_REFRESH_TOKEN: replace
+      DROPBOX_SOURCE_FOLDER: /From_BrotherDevice
+      DROPBOX_SYNC_INTERVAL_SECONDS: 1800
+      DROPBOX_CLIENT_ID: 5iec59wlnfjxusl
+      DROPBOX_CLIENT_SECRET: replace
+      DROPBOX_REDIRECT_URL: http://192.168.1.107:3000/dropbox/authorize
+      DROPBOX_OAUTH_SETUP_ENABLED: true
+      OPERATIONAL_SETUP_KEY: replace
+      OPENAI_API_KEY: replace
+      OPENAI_EMBEDDING_MODEL: text-embedding-3-small
+      VECTOR_INDEX_NAME: documents_vector_index
+      OCR_TEMP_DIR: .tmp/ocr
+      VECTOR_SEARCH_ENABLED: false
+      OCR_AUTO_ROTATE: true
+      OCR_DPI: 300
+      OCR_LOW_CONFIDENCE_THRESHOLD: 65
+    ports:
+      - "3001:80"
+      - "3000:3000"
+    restart: unless-stopped
