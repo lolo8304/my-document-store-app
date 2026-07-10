@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FileDown, FileText } from 'lucide-react';
+import { FileDown, FileText, SquarePen, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { getLatestDocuments, getSettings, searchDocuments, SearchResult, SearchType, stopDropboxSync, syncDropbox } from '../api';
+import { getLatestDocuments, getSettings, searchDocuments, SearchResult, SearchType, stopDropboxSync, syncDropbox, updateDocumentTitle } from '../api';
 import { SearchHeader } from '../components/SearchHeader';
 import { HighlightedText } from '../highlight';
 import { clearPersistedSearchState, readPersistedSearchState, writePersistedSearchState } from '../searchState';
@@ -23,6 +23,10 @@ export default function App() {
   const [syncLoading, setSyncLoading] = useState(false);
   const [stopSyncLoading, setStopSyncLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const [editingTitleId, setEditingTitleId] = useState<string | undefined>();
+  const [titleDraft, setTitleDraft] = useState('');
+  const [titleSavingId, setTitleSavingId] = useState<string | undefined>();
+  const [titleError, setTitleError] = useState<{ documentId: string; message: string } | undefined>();
   const [vectorSearchEnabled, setVectorSearchEnabled] = useState(false);
   const loadingMoreRef = useRef(false);
   const syncProgress = useSyncProgress();
@@ -148,6 +152,62 @@ export default function App() {
     navigate('/');
   }
 
+  function startTitleEdit(documentId: string, title: string) {
+    setEditingTitleId(documentId);
+    setTitleDraft(title);
+    setTitleError(undefined);
+  }
+
+  function cancelTitleEdit() {
+    setEditingTitleId(undefined);
+    setTitleDraft('');
+    setTitleError(undefined);
+  }
+
+  async function saveTitle(documentId: string, currentTitle: string) {
+    if (titleSavingId) {
+      return;
+    }
+
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle) {
+      setTitleError({ documentId, message: 'Document title is required' });
+      return;
+    }
+    if (nextTitle === currentTitle) {
+      cancelTitleEdit();
+      return;
+    }
+
+    setTitleSavingId(documentId);
+    setTitleError(undefined);
+    try {
+      const response = await updateDocumentTitle(documentId, nextTitle);
+      setResult((current) => {
+        if (!current) {
+          return current;
+        }
+        const nextResult = {
+          ...current,
+          items: current.items.map((item) => (item.documentId === documentId ? { ...item, title: response.title } : item)),
+        };
+        writePersistedSearchState({
+          query: resultQuery,
+          type,
+          page,
+          result: nextResult,
+        });
+        return nextResult;
+      });
+      setEditingTitleId(undefined);
+      setTitleDraft('');
+    } catch (err) {
+      setTitleError({ documentId, message: err instanceof Error ? err.message : 'Could not update document title' });
+    } finally {
+      setTitleSavingId(undefined);
+    }
+  }
+
   const hasMoreResults = result ? result.items.length < result.total : false;
 
   useEffect(() => {
@@ -209,23 +269,78 @@ export default function App() {
         <div className="divide-y divide-stone-200 border-y border-stone-200 bg-white">
           {result?.items.map((item) => {
             const itemMissingTerms = missingTerms(resultQuery, item.matchedTerms);
+            const title = item.title ?? item.fileName;
             return (
               <article
                 key={item.documentId}
-                role="link"
-                tabIndex={0}
-                onClick={() => navigate(`/documents/${item.documentId}/text`)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    navigate(`/documents/${item.documentId}/text`);
-                  }
-                }}
-                className="cursor-pointer p-4 hover:bg-stone-50"
+                className="p-4"
               >
                 <div>
                   <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
-                    <h2 className="min-w-0 flex-1 text-xl font-semibold">{item.fileName}</h2>
+                    <div className="min-w-0">
+                      {editingTitleId === item.documentId ? (
+                        <form
+                          className="flex min-w-0 items-start gap-2"
+                          onSubmit={(event) => {
+                            event.preventDefault();
+                            void saveTitle(item.documentId, title);
+                          }}
+                        >
+                          <input
+                            className="min-w-0 flex-1 rounded border border-stone-300 bg-white px-2 py-1 text-xl font-semibold text-stone-950 outline-none focus:border-stone-500 disabled:bg-stone-100"
+                            value={titleDraft}
+                            disabled={titleSavingId === item.documentId}
+                            autoFocus
+                            aria-label={`Edit title for ${title}`}
+                            onChange={(event) => setTitleDraft(event.target.value)}
+                            onBlur={() => void saveTitle(item.documentId, title)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Escape') {
+                                event.preventDefault();
+                                cancelTitleEdit();
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                            title="Cancel edit"
+                            aria-label={`Cancel title edit for ${title}`}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              cancelTitleEdit();
+                            }}
+                          >
+                            <X className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </form>
+                      ) : (
+                        <div className="flex min-w-0 items-start gap-2">
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 break-words text-left text-xl font-semibold text-stone-950 hover:text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
+                            title="Edit title"
+                            aria-label={`Edit title for ${title}`}
+                            onClick={() => startTitleEdit(item.documentId, title)}
+                            onFocus={() => startTitleEdit(item.documentId, title)}
+                          >
+                            {title}
+                          </button>
+                          <button
+                            type="button"
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                            title="Edit title"
+                            aria-label={`Edit title for ${title}`}
+                            onClick={() => startTitleEdit(item.documentId, title)}
+                          >
+                            <SquarePen className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      )}
+                      {titleError?.documentId === item.documentId && (
+                        <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{titleError.message}</div>
+                      )}
+                    </div>
                     {item.language && <span className="shrink-0 text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
                     <div className="flex shrink-0 justify-end gap-2">
                       {item.pdfUrl && (
@@ -235,7 +350,7 @@ export default function App() {
                           target="_blank"
                           rel="noreferrer"
                           title="Open PDF"
-                          aria-label={`Open PDF for ${item.fileName}`}
+                          aria-label={`Open PDF for ${title}`}
                           onClick={(event) => event.stopPropagation()}
                         >
                           <FileDown className="h-5 w-5" aria-hidden="true" />
@@ -245,14 +360,28 @@ export default function App() {
                         className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
                         to={`/documents/${item.documentId}/text`}
                         title="Open text"
-                        aria-label={`Open text for ${item.fileName}`}
+                        aria-label={`Open text for ${title}`}
                         onClick={(event) => event.stopPropagation()}
                       >
                         <FileText className="h-5 w-5" aria-hidden="true" />
                       </Link>
                     </div>
                   </div>
-                  <p className="mt-1 text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
+                </div>
+                <div
+                  role="link"
+                  tabIndex={0}
+                  className="mt-1 cursor-pointer rounded p-1 -mx-1 hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
+                  aria-label={`Open text for ${title}`}
+                  onClick={() => navigate(`/documents/${item.documentId}/text`)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      navigate(`/documents/${item.documentId}/text`);
+                    }
+                  }}
+                >
+                  <p className="text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
                   {itemMissingTerms.length > 0 && (
                     <p className="mt-1 text-sm text-stone-400">
                       {itemMissingTerms.map((term) => (
@@ -262,10 +391,10 @@ export default function App() {
                       ))}
                     </p>
                   )}
+                  <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
+                    <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
+                  </p>
                 </div>
-                <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
-                  <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
-                </p>
               </article>
             );
           })}

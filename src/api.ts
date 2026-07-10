@@ -2,6 +2,7 @@ export type SearchType = 'query' | 'question';
 
 export interface SearchResultItem {
   documentId: string;
+  title: string;
   fileName: string;
   language?: string;
   createdAt?: string;
@@ -22,7 +23,15 @@ export interface SearchResult {
 
 export interface FullTextResult {
   documentId: string;
+  title: string;
+  fileName: string;
   text: string;
+}
+
+export interface UpdateDocumentResult {
+  documentId: string;
+  title: string;
+  fileName: string;
 }
 
 export interface AppSettings {
@@ -105,6 +114,24 @@ async function apiPost<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'PATCH',
+    headers: {
+      api_key: apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
 export function searchDocuments(query: string, type: SearchType, page = 1, pageSize = 20) {
   const params = new URLSearchParams({
     q: query,
@@ -137,6 +164,10 @@ export function getAdminStatus() {
 
 export function getDocumentText(id: string) {
   return apiFetch<FullTextResult>(`/documents/${id}/text`);
+}
+
+export function updateDocumentTitle(id: string, title: string) {
+  return apiPatch<UpdateDocumentResult>(`/documents/${id}`, { title });
 }
 
 export function getPdfLink(id: string) {
