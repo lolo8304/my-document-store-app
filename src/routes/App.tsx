@@ -12,6 +12,7 @@ import {
   TagMode,
   stopDropboxSync,
   syncDropbox,
+  updateDocumentSentDate,
   updateDocumentTags,
   updateDocumentTitle,
 } from '../api';
@@ -48,10 +49,15 @@ export default function App() {
   const [titleError, setTitleError] = useState<{ documentId: string; message: string } | undefined>();
   const [tagSavingId, setTagSavingId] = useState<string | undefined>();
   const [tagError, setTagError] = useState<{ documentId: string; message: string } | undefined>();
+  const [editingSentDateId, setEditingSentDateId] = useState<string | undefined>();
+  const [sentDateDraft, setSentDateDraft] = useState('');
+  const [sentDateSavingId, setSentDateSavingId] = useState<string | undefined>();
+  const [sentDateError, setSentDateError] = useState<{ documentId: string; message: string } | undefined>();
   const [editedDocumentIds, setEditedDocumentIds] = useState<Set<string>>(() => new Set());
   const [vectorSearchEnabled, setVectorSearchEnabled] = useState(false);
   const [showDocumentTagControls, setShowDocumentTagControls] = useState(readDocumentTagControlsPreference);
   const loadingMoreRef = useRef(false);
+  const sentDateInputRef = useRef<HTMLInputElement>(null);
   const syncProgress = useSyncProgress();
 
   useEffect(() => {
@@ -76,6 +82,13 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!editingSentDateId) {
+      return;
+    }
+    window.requestAnimationFrame(() => sentDateInputRef.current?.focus());
+  }, [editingSentDateId]);
 
   const runSearch = useCallback(async (nextPage = 1, append = false, nextTagFilters = tagFilters, queryOverride = query, nextTagMode = tagMode) => {
     const nextQuery = queryOverride.trim();
@@ -336,6 +349,67 @@ export default function App() {
     }
   }
 
+  function startSentDateEdit(documentId: string, currentSentDate?: string, fallbackDate?: string) {
+    setEditingSentDateId(documentId);
+    setSentDateDraft(currentSentDate ?? toDateInputValue(fallbackDate) ?? '');
+    setSentDateError(undefined);
+  }
+
+  function cancelSentDateEdit() {
+    setEditingSentDateId(undefined);
+    setSentDateDraft('');
+    setSentDateError(undefined);
+  }
+
+  async function saveSentDate(documentId: string, currentSentDate?: string) {
+    if (sentDateSavingId) {
+      return;
+    }
+
+    const nextSentDate = sentDateDraft || undefined;
+    if (nextSentDate === currentSentDate) {
+      cancelSentDateEdit();
+      return;
+    }
+
+    setSentDateSavingId(documentId);
+    setSentDateError(undefined);
+    try {
+      const response = await updateDocumentSentDate(documentId, nextSentDate ?? null);
+      setEditedDocumentIds((current) => {
+        const next = new Set(current);
+        next.add(documentId);
+        return next;
+      });
+      setResult((current) => {
+        if (!current) {
+          return current;
+        }
+        const nextResult = {
+          ...current,
+          items: current.items.map((item) =>
+            item.documentId === documentId ? { ...item, sentAt: response.sentAt, hasSentDate: response.hasSentDate } : item,
+          ),
+        };
+        writePersistedSearchState({
+          query: resultQuery,
+          type,
+          tagFilters,
+          tagMode,
+          page,
+          result: nextResult,
+        });
+        return nextResult;
+      });
+      setEditingSentDateId(undefined);
+      setSentDateDraft('');
+    } catch (err) {
+      setSentDateError({ documentId, message: err instanceof Error ? err.message : 'Could not update sent date' });
+    } finally {
+      setSentDateSavingId(undefined);
+    }
+  }
+
   async function toggleDocumentTag(documentId: string, currentTags: DocumentTag[], tag: DocumentTag) {
     if (tagSavingId) {
       return;
@@ -545,9 +619,64 @@ export default function App() {
                   </div>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <p className="text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
+                  <p className="text-base text-stone-500">scanned: {formatDate(item.modifiedAt ?? item.createdAt)}</p>
+                  {editingSentDateId === item.documentId ? (
+                    <form
+                      className="flex items-center gap-1"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        void saveSentDate(item.documentId, item.sentAt);
+                      }}
+                    >
+                      <span className="text-base text-stone-500">, sent:</span>
+                      <input
+                        ref={sentDateInputRef}
+                        type="date"
+                        value={sentDateDraft}
+                        disabled={sentDateSavingId === item.documentId}
+                        className="h-8 rounded border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-stone-900 disabled:cursor-not-allowed disabled:text-stone-300"
+                        aria-label={`Sent date for ${title}`}
+                        onChange={(event) => setSentDateDraft(event.target.value)}
+                        onBlur={() => void saveSentDate(item.documentId, item.sentAt)}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            void saveSentDate(item.documentId, item.sentAt);
+                            return;
+                          }
+                          if (event.key === 'Escape') {
+                            event.preventDefault();
+                            cancelSentDateEdit();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                        title="Cancel sent date edit"
+                        aria-label={`Cancel sent date edit for ${title}`}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          cancelSentDateEdit();
+                        }}
+                      >
+                        <X className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-base text-stone-500 hover:text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
+                      title="Edit sent date"
+                      aria-label={`Edit sent date for ${title}`}
+                      onClick={() => startSentDateEdit(item.documentId, item.sentAt, item.createdAt)}
+                    >
+                      , sent: {item.sentAt ? formatSentDate(item.sentAt) : '-'}
+                    </button>
+                  )}
                   {showDocumentTagControls && (
-                    <div className="flex items-center gap-1" aria-label={`Tags for ${title}`}>
+                    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1" aria-label={`Tags for ${title}`}>
                       {editedDocumentIds.has(item.documentId) && (
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600"
@@ -577,6 +706,9 @@ export default function App() {
                     </div>
                   )}
                 </div>
+                {sentDateError?.documentId === item.documentId && (
+                  <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{sentDateError.message}</div>
+                )}
                 {showDocumentTagControls && tagError?.documentId === item.documentId && (
                   <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{tagError.message}</div>
                 )}
@@ -656,6 +788,20 @@ function formatDate(value?: string) {
     return '';
   }
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function formatSentDate(value?: string) {
+  if (!value) {
+    return '';
+  }
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`));
+}
+
+function toDateInputValue(value?: string) {
+  if (!value) {
+    return undefined;
+  }
+  return new Date(value).toISOString().slice(0, 10);
 }
 
 function languageLabel(language: string) {

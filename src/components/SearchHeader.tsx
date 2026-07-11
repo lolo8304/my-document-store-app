@@ -232,8 +232,8 @@ export function SearchHeader({
             </button>
           </div>
 
-          <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 text-base text-stone-600">
-            <div className="flex items-center gap-1" aria-label="Tag filters">
+          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-1 text-base text-stone-600">
+            <div className="contents" aria-label="Tag filters">
               {documentTags.map((tag) => {
                 const active = tagFilters.includes(tag.value);
                 return (
@@ -268,7 +268,7 @@ export function SearchHeader({
               )}
             </div>
             {!syncProgress?.running && (
-              <div className="flex items-center gap-1">
+              <>
                 <button
                   type="button"
                   onClick={onAll}
@@ -301,19 +301,21 @@ export function SearchHeader({
                 >
                   10
                 </button>
-              </div>
+              </>
             )}
-            <span>{syncStatusText(syncProgress, syncLoading, hideCompletedStatus)}</span>
+            <span className="h-8 rounded border border-transparent px-2 text-sm leading-8">
+              {syncStatusText(syncProgress, syncLoading, hideCompletedStatus)}
+            </span>
             {syncProgress?.running && syncProgress.total > 0 && (
-              <span className="tabular-nums">
+              <span className="h-8 rounded border border-transparent px-2 text-sm leading-8 tabular-nums">
                 {syncProgress.current} / {syncProgress.total}
               </span>
             )}
             {syncProgress?.running && syncProgress.phase && syncProgress.phase !== 'idle' && (
-              <span>{phaseLabel(syncProgress.phase)}</span>
+              <span className="h-8 rounded border border-transparent px-2 text-sm leading-8">{phaseLabel(syncProgress.phase)}</span>
             )}
             {syncProgress?.running && syncProgress.fileName && (
-              <span className="min-w-0 max-w-full truncate text-stone-500 sm:max-w-md" title={syncProgress.fileName}>
+              <span className="h-8 min-w-0 max-w-full truncate rounded border border-transparent px-2 text-sm leading-8 text-stone-500 sm:max-w-md" title={syncProgress.fileName}>
                 {syncProgress.fileName}
                 {displayedFileElapsedSeconds !== undefined && ` - ${displayedFileElapsedSeconds}s`}
               </span>

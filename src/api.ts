@@ -26,6 +26,8 @@ export interface SearchResultItem {
   language?: string;
   createdAt?: string;
   modifiedAt?: string;
+  sentAt?: string;
+  hasSentDate: boolean;
   excerpt: string;
   matchedTerms: string[];
   textUrl: string;
@@ -53,6 +55,8 @@ export interface UpdateDocumentResult {
   title: string;
   fileName: string;
   tags: DocumentTag[];
+  sentAt?: string;
+  hasSentDate: boolean;
 }
 
 export interface AppSettings {
@@ -204,6 +208,10 @@ export function updateDocumentTitle(id: string, title: string) {
 
 export function updateDocumentTags(id: string, tags: DocumentTag[]) {
   return apiPatch<UpdateDocumentResult>(`/documents/${id}`, { tags });
+}
+
+export function updateDocumentSentDate(id: string, sentAt: string | null) {
+  return apiPatch<UpdateDocumentResult>(`/documents/${id}`, { sentAt });
 }
 
 export function getDocumentTagDefinitions() {

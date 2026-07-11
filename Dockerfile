@@ -52,7 +52,7 @@ ENV PORT=3000
 ENV APP_CORS_ORIGIN=http://192.168.1.107:3001
 ENV OCR_LANGUAGES=deu+eng+fra
 ENV MY_DOCUMENT_STORE_API_KEY=replace
-ENV MONGODB_URI=mongodb+srv://lolo8304:od5vcG8kiUVBqKuY@app-fcrww.3llam.mongodb.net/?appName=app-fcrww
+ENV MONGODB_URI=replace
 ENV MONGODB_DB_NAME=my-document-store-local
 ENV DROPBOX_BASE_LOCATION=/localhost
 ENV DROPBOX_ACCESS_TOKEN=replace
