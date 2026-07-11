@@ -10,6 +10,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 3001"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@vitejs/plugin-react": "^4.6.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.0",

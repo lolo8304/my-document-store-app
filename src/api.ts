@@ -1,9 +1,28 @@
 export type SearchType = 'query' | 'question';
+export type DocumentTag = string;
+export type TagMode = 'or' | 'and';
+
+export interface DocumentTagOption {
+  id: string;
+  value: DocumentTag;
+  label: string;
+  name: string;
+  icon?: string;
+}
+
+export interface DocumentTagDefinition {
+  id: string;
+  short: string;
+  text: string;
+  icon?: string;
+  order?: number;
+}
 
 export interface SearchResultItem {
   documentId: string;
   title: string;
   fileName: string;
+  tags: DocumentTag[];
   language?: string;
   createdAt?: string;
   modifiedAt?: string;
@@ -25,6 +44,7 @@ export interface FullTextResult {
   documentId: string;
   title: string;
   fileName: string;
+  tags: DocumentTag[];
   text: string;
 }
 
@@ -32,12 +52,14 @@ export interface UpdateDocumentResult {
   documentId: string;
   title: string;
   fileName: string;
+  tags: DocumentTag[];
 }
 
 export interface AppSettings {
   features: {
     vectorSearchEnabled: boolean;
   };
+  documentTags: DocumentTagDefinition[];
 }
 
 export interface SyncResult {
@@ -132,18 +154,28 @@ async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function searchDocuments(query: string, type: SearchType, page = 1, pageSize = 20) {
+function appendTags(params: URLSearchParams, tags: DocumentTag[]) {
+  if (tags.length > 0) {
+    params.set('tags', tags.join(','));
+  }
+}
+
+export function searchDocuments(query: string, type: SearchType, page = 1, pageSize = 20, tags: DocumentTag[] = [], tagMode: TagMode = 'or') {
   const params = new URLSearchParams({
     q: query,
     type,
     page: String(page),
     pageSize: String(pageSize),
+    tagMode,
   });
+  appendTags(params, tags);
   return apiFetch<SearchResult>(`/documents/search?${params.toString()}`);
 }
 
-export function getLatestDocuments(limit: 1 | 2 | 10) {
-  return apiFetch<SearchResult>(`/documents/latest?limit=${limit}`);
+export function getLatestDocuments(limit: 1 | 2 | 10, tags: DocumentTag[] = [], tagMode: TagMode = 'or') {
+  const params = new URLSearchParams({ limit: String(limit), tagMode });
+  appendTags(params, tags);
+  return apiFetch<SearchResult>(`/documents/latest?${params.toString()}`);
 }
 
 export function getSettings() {
@@ -168,6 +200,64 @@ export function getDocumentText(id: string) {
 
 export function updateDocumentTitle(id: string, title: string) {
   return apiPatch<UpdateDocumentResult>(`/documents/${id}`, { title });
+}
+
+export function updateDocumentTags(id: string, tags: DocumentTag[]) {
+  return apiPatch<UpdateDocumentResult>(`/documents/${id}`, { tags });
+}
+
+export function getDocumentTagDefinitions() {
+  return apiFetch<DocumentTagDefinition[]>('/settings/document-tags');
+}
+
+export function createDocumentTagDefinition(short: string, text: string, icon?: string) {
+  return apiPostBody<DocumentTagDefinition>('/settings/document-tags', { short, text, icon });
+}
+
+export function updateDocumentTagDefinition(id: string, short: string, text: string, icon?: string) {
+  return apiPatch<DocumentTagDefinition>(`/settings/document-tags/${id}`, { short, text, icon });
+}
+
+export function reorderDocumentTagDefinitions(ids: string[]) {
+  return apiPatch<DocumentTagDefinition[]>('/settings/document-tags/order', { ids });
+}
+
+export function deleteDocumentTagDefinition(id: string) {
+  return apiDelete<{ id: string; hidden: true }>(`/settings/document-tags/${id}`);
+}
+
+async function apiPostBody<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: {
+      api_key: apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
+}
+
+async function apiDelete<T>(path: string): Promise<T> {
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    method: 'DELETE',
+    headers: {
+      api_key: apiKey,
+    },
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<T>;
 }
 
 export function getPdfLink(id: string) {

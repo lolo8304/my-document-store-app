@@ -1,6 +1,10 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Brain, FileText, RefreshCw, Search, Square, X } from 'lucide-react';
-import { SearchType } from '../api';
+import { Brain, Cog, FileText, PlusCircle, RefreshCw, Search, Square, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { DocumentTag, DocumentTagOption, SearchType, TagMode } from '../api';
+import { DynamicHeroIcon, hasHeroIconInput, resolveHeroIconName } from '../dynamic-icons';
+
+const noTagsFilterTag = 'no-symbol';
 
 interface SearchHeaderProps {
   query: string;
@@ -17,9 +21,17 @@ interface SearchHeaderProps {
     fileName?: string;
     fileElapsedSeconds?: number;
   };
+  documentTags: DocumentTagOption[];
+  tagFilters: DocumentTag[];
+  tagMode: TagMode;
+  showDocumentTagControls?: boolean;
   vectorSearchEnabled: boolean;
   onQueryChange: (query: string) => void;
   onTypeChange: (type: SearchType) => void;
+  onTagFiltersChange: (tags: DocumentTag[]) => void;
+  onTagModeChange: (tagMode: TagMode) => void;
+  onToggleDocumentTagControls?: () => void;
+  onAll: () => void;
   onSubmit: () => void;
   onLatest: (limit: 1 | 2 | 10) => void;
   onReset: () => void;
@@ -34,9 +46,17 @@ export function SearchHeader({
   syncLoading,
   stopSyncLoading,
   syncProgress,
+  documentTags,
+  tagFilters,
+  tagMode,
+  showDocumentTagControls,
   vectorSearchEnabled,
   onQueryChange,
   onTypeChange,
+  onTagFiltersChange,
+  onTagModeChange,
+  onToggleDocumentTagControls,
+  onAll,
   onSubmit,
   onLatest,
   onReset,
@@ -99,17 +119,50 @@ export function SearchHeader({
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }
 
+  function toggleTagFilter(tag: DocumentTag) {
+    const nextTags = tagFilters.includes(tag)
+      ? tagFilters.filter((item) => item !== tag)
+      : tag === noTagsFilterTag
+        ? [tag]
+        : [...tagFilters.filter((item) => item !== noTagsFilterTag), tag];
+    onTagFiltersChange(nextTags);
+  }
+
   return (
     <section className="border-b border-stone-200 bg-white">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4">
         <div>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="text-left text-3xl font-semibold tracking-normal hover:text-stone-700 sm:text-5xl"
-          >
-            Hänggi document search
-          </button>
+          <div className="flex items-start justify-between gap-3">
+            <button
+              type="button"
+              onClick={handleReset}
+              className="min-w-0 text-left text-3xl font-semibold tracking-normal hover:text-stone-700 sm:text-5xl"
+            >
+              Hänggi document search
+            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              {onToggleDocumentTagControls && (
+                <button
+                  type="button"
+                  className="flex h-10 w-10 items-center justify-center rounded border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 hover:text-stone-950"
+                  title={showDocumentTagControls ? 'Hide document tag buttons' : 'Show document tag buttons'}
+                  aria-label={showDocumentTagControls ? 'Hide document tag buttons' : 'Show document tag buttons'}
+                  aria-pressed={showDocumentTagControls}
+                  onClick={onToggleDocumentTagControls}
+                >
+                  <DynamicHeroIcon className="h-5 w-5" name={showDocumentTagControls ? 'EyeSlashIcon' : 'EyeIcon'} aria-hidden="true" />
+                </button>
+              )}
+              <Link
+                className="flex h-10 w-10 items-center justify-center rounded border border-stone-300 bg-white text-stone-700 hover:bg-stone-100 hover:text-stone-950"
+                to="/settings"
+                title="Settings"
+                aria-label="Settings"
+              >
+                <Cog className="h-5 w-5" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -180,8 +233,50 @@ export function SearchHeader({
           </div>
 
           <div className="flex min-h-8 flex-wrap items-center gap-x-3 gap-y-1 text-base text-stone-600">
+            <div className="flex items-center gap-1" aria-label="Tag filters">
+              {documentTags.map((tag) => {
+                const active = tagFilters.includes(tag.value);
+                return (
+                  <button
+                    key={tag.value}
+                    type="button"
+                    title={tag.name}
+                    aria-label={`Filter ${tag.name}`}
+                    aria-pressed={active}
+                    onClick={() => toggleTagFilter(tag.value)}
+                    className={`flex h-8 min-w-8 items-center justify-center rounded border px-2 text-sm font-semibold ${
+                      active ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-950 bg-white text-stone-950 hover:bg-stone-100'
+                    }`}
+                  >
+                    <TagLabel tag={tag} />
+                  </button>
+                );
+              })}
+              {tagFilters.length > 1 && (
+                <button
+                  type="button"
+                  title={tagMode === 'and' ? 'Match any selected tag' : 'Match all selected tags'}
+                  aria-label={tagMode === 'and' ? 'Use OR tag search' : 'Use AND tag search'}
+                  aria-pressed={tagMode === 'and'}
+                  onClick={() => onTagModeChange(tagMode === 'and' ? 'or' : 'and')}
+                  className={`flex h-8 w-8 items-center justify-center rounded border ${
+                    tagMode === 'and' ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-950 bg-white text-stone-950 hover:bg-stone-100'
+                  }`}
+                >
+                  <PlusCircle className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
+            </div>
             {!syncProgress?.running && (
               <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onAll}
+                  disabled={latestLoading}
+                  className="h-8 rounded border border-stone-300 bg-white px-3 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:cursor-not-allowed disabled:text-stone-300"
+                >
+                  all
+                </button>
                 <button
                   type="button"
                   onClick={() => onLatest(1)}
@@ -240,6 +335,14 @@ export function SearchHeader({
       </div>
     </section>
   );
+}
+
+function TagLabel({ tag }: { tag: DocumentTagOption }) {
+  const iconName = resolveHeroIconName(tag.icon);
+  if (iconName || hasHeroIconInput(tag.icon)) {
+    return <DynamicHeroIcon className="h-4 w-4" name={iconName ?? 'QuestionMarkCircleIcon'} aria-hidden="true" />;
+  }
+  return tag.label;
 }
 
 function phaseLabel(phase: string) {

@@ -1,7 +1,20 @@
 import { useEffect, useState } from 'react';
 import { ArrowLeft, FileDown, FileText, SquarePen, X } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { getDocumentText, getLatestDocuments, getPdfLink, getSettings, searchDocuments, SearchType, stopDropboxSync, syncDropbox, updateDocumentTitle } from '../api';
+import {
+  DocumentTag,
+  DocumentTagOption,
+  getDocumentText,
+  getLatestDocuments,
+  getPdfLink,
+  getSettings,
+  searchDocuments,
+  SearchType,
+  TagMode,
+  stopDropboxSync,
+  syncDropbox,
+  updateDocumentTitle,
+} from '../api';
 import { SearchHeader } from '../components/SearchHeader';
 import { Toast } from '../components/Toast';
 import { HighlightedText } from '../highlight';
@@ -16,6 +29,9 @@ export default function DocumentTextPage() {
   const persistedSearch = readPersistedSearchState();
   const [query, setQuery] = useState(persistedSearch?.query ?? '');
   const [type, setType] = useState<SearchType>(persistedSearch?.type ?? 'query');
+  const [documentTags, setDocumentTags] = useState<DocumentTagOption[]>([]);
+  const [tagFilters, setTagFilters] = useState<DocumentTag[]>(persistedSearch?.tagFilters ?? []);
+  const [tagMode, setTagMode] = useState<TagMode>((persistedSearch?.tagFilters?.length ?? 0) > 1 ? persistedSearch?.tagMode ?? 'or' : 'or');
   const [documentTitle, setDocumentTitle] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
   const [editingTitle, setEditingTitle] = useState(false);
@@ -39,6 +55,7 @@ export default function DocumentTextPage() {
       .then((settings) => {
         if (active) {
           setVectorSearchEnabled(settings.features.vectorSearchEnabled);
+          setDocumentTags(settings.documentTags.map(toDocumentTagOption));
           if (!settings.features.vectorSearchEnabled) {
             setType('query');
           }
@@ -100,7 +117,15 @@ export default function DocumentTextPage() {
   }, [statusMessage]);
 
   async function runSearch() {
-    if (!query.trim()) {
+    const nextQuery = query.trim();
+    const effectiveTagMode = tagFilters.length > 1 ? tagMode : 'or';
+    const latestLimit = parseLatestQuery(nextQuery);
+    if (latestLimit) {
+      await runLatest(latestLimit, tagFilters, effectiveTagMode);
+      return;
+    }
+
+    if (!nextQuery && tagFilters.length === 0) {
       clearPersistedSearchState();
       navigate('/');
       return;
@@ -108,11 +133,13 @@ export default function DocumentTextPage() {
 
     setError(undefined);
     try {
-      const effectiveType = vectorSearchEnabled ? type : 'query';
-      const result = await searchDocuments(query.trim(), effectiveType, 1, searchPageSize);
+      const effectiveType = nextQuery && vectorSearchEnabled ? type : 'query';
+      const result = await searchDocuments(nextQuery, effectiveType, 1, searchPageSize, tagFilters, effectiveTagMode);
       writePersistedSearchState({
-        query: query.trim(),
+        query: nextQuery,
         type: effectiveType,
+        tagFilters,
+        tagMode: effectiveTagMode,
         page: 1,
         result,
       });
@@ -136,17 +163,20 @@ export default function DocumentTextPage() {
     }
   }
 
-  async function runLatest(limit: 1 | 2 | 10) {
+  async function runLatest(limit: 1 | 2 | 10, nextTagFilters = tagFilters, nextTagMode = tagMode) {
+    const effectiveTagMode = nextTagFilters.length > 1 ? nextTagMode : 'or';
     setLatestLoading(true);
     setError(undefined);
     setStatusMessage(undefined);
     try {
-      const response = await getLatestDocuments(limit);
+      const response = await getLatestDocuments(limit, nextTagFilters, effectiveTagMode);
       const latestResult = { ...response, total: response.items.length };
       const nextQuery = limit === 1 ? 'last' : `last ${limit}`;
       writePersistedSearchState({
         query: nextQuery,
         type: 'query',
+        tagFilters: nextTagFilters,
+        tagMode: effectiveTagMode,
         page: 1,
         result: latestResult,
       });
@@ -176,9 +206,91 @@ export default function DocumentTextPage() {
     clearPersistedSearchState();
     setQuery('');
     setType('query');
+    setTagFilters([]);
+    setTagMode('or');
     setError(undefined);
     setStatusMessage(undefined);
     navigate('/');
+  }
+
+  function handleTagFiltersChange(nextTags: DocumentTag[]) {
+    const nextTagMode = nextTags.length > 1 ? tagMode : 'or';
+    setTagFilters(nextTags);
+    setTagMode(nextTagMode);
+    const latestLimit = parseLatestQuery(query);
+    if (latestLimit) {
+      void runLatest(latestLimit, nextTags, nextTagMode);
+      return;
+    }
+    if (query.trim() || nextTags.length > 0) {
+      const nextQuery = query.trim();
+      const effectiveType = nextQuery && vectorSearchEnabled ? type : 'query';
+      searchDocuments(nextQuery, effectiveType, 1, searchPageSize, nextTags, nextTagMode)
+        .then((result) => {
+          writePersistedSearchState({
+            query: nextQuery,
+            type: effectiveType,
+            tagFilters: nextTags,
+            tagMode: nextTagMode,
+            page: 1,
+            result,
+          });
+          navigate('/');
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : 'Search failed'));
+      return;
+    }
+    clearPersistedSearchState();
+  }
+
+  function handleAll() {
+    setTagFilters([]);
+    setTagMode('or');
+    setQuery('all');
+    searchDocuments('all', 'query', 1, searchPageSize, [], 'or')
+      .then((result) => {
+        writePersistedSearchState({
+          query: 'all',
+          type: 'query',
+          tagFilters: [],
+          tagMode: 'or',
+          page: 1,
+          result,
+        });
+        navigate('/');
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Search failed'));
+  }
+
+  function handleTagModeChange(nextTagMode: TagMode) {
+    if (tagFilters.length <= 1) {
+      return;
+    }
+
+    setTagMode(nextTagMode);
+    const latestLimit = parseLatestQuery(query);
+    if (latestLimit) {
+      void runLatest(latestLimit, tagFilters, nextTagMode);
+      return;
+    }
+
+    const nextQuery = query.trim();
+    if (nextQuery || tagFilters.length > 0) {
+      const effectiveType = nextQuery && vectorSearchEnabled ? type : 'query';
+      searchDocuments(nextQuery, effectiveType, 1, searchPageSize, tagFilters, nextTagMode)
+        .then((result) => {
+          writePersistedSearchState({
+            query: nextQuery,
+            type: effectiveType,
+            tagFilters,
+            tagMode: nextTagMode,
+            page: 1,
+            result,
+          });
+          navigate('/');
+        })
+        .catch((err) => setError(err instanceof Error ? err.message : 'Search failed'));
+    }
   }
 
   function startTitleEdit() {
@@ -234,9 +346,15 @@ export default function DocumentTextPage() {
         syncLoading={syncLoading}
         stopSyncLoading={stopSyncLoading}
         syncProgress={syncProgress}
+        documentTags={documentTags}
+        tagFilters={tagFilters}
+        tagMode={tagMode}
         vectorSearchEnabled={vectorSearchEnabled}
         onQueryChange={setQuery}
         onTypeChange={setType}
+        onTagFiltersChange={handleTagFiltersChange}
+        onTagModeChange={handleTagModeChange}
+        onAll={handleAll}
         onSubmit={() => void runSearch()}
         onLatest={(limit) => void runLatest(limit)}
         onReset={resetSearch}
@@ -257,7 +375,7 @@ export default function DocumentTextPage() {
           <div className="flex shrink-0 justify-end gap-2">
             {pdfUrl && (
               <a
-                className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                className="flex h-8 w-8 items-center justify-center rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-900"
                 href={pdfUrl}
                 target="_blank"
                 rel="noreferrer"
@@ -370,6 +488,16 @@ function updatePersistedDocumentTitle(documentId: string, title: string) {
   });
 }
 
+function toDocumentTagOption(tag: { id: string; short: string; text: string; icon?: string }): DocumentTagOption {
+  return {
+    id: tag.id,
+    value: tag.text,
+    label: tag.short,
+    name: tag.text,
+    icon: tag.icon,
+  };
+}
+
 function normalizeHighlightTerms(input: string): string[] {
   return Array.from(
     new Set(
@@ -380,4 +508,18 @@ function normalizeHighlightTerms(input: string): string[] {
         .filter((term) => term.length > 1 && term !== 'last'),
     ),
   );
+}
+
+function parseLatestQuery(value: string): 1 | 2 | 10 | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'last') {
+    return 1;
+  }
+  if (normalized === 'last 2') {
+    return 2;
+  }
+  if (normalized === 'last 10') {
+    return 10;
+  }
+  return undefined;
 }
