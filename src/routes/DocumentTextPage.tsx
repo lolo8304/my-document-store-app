@@ -349,6 +349,8 @@ export default function DocumentTextPage() {
         documentTags={documentTags}
         tagFilters={tagFilters}
         tagMode={tagMode}
+        sortBy="scanned"
+        missingSent={false}
         vectorSearchEnabled={vectorSearchEnabled}
         onQueryChange={setQuery}
         onTypeChange={setType}

@@ -1,6 +1,7 @@
 export type SearchType = 'query' | 'question';
 export type DocumentTag = string;
 export type TagMode = 'or' | 'and';
+export type DocumentSortBy = 'sent' | 'scanned';
 
 export interface DocumentTagOption {
   id: string;
@@ -164,7 +165,16 @@ function appendTags(params: URLSearchParams, tags: DocumentTag[]) {
   }
 }
 
-export function searchDocuments(query: string, type: SearchType, page = 1, pageSize = 20, tags: DocumentTag[] = [], tagMode: TagMode = 'or') {
+export function searchDocuments(
+  query: string,
+  type: SearchType,
+  page = 1,
+  pageSize = 20,
+  tags: DocumentTag[] = [],
+  tagMode: TagMode = 'or',
+  sortBy?: DocumentSortBy,
+  missingSent = false,
+) {
   const params = new URLSearchParams({
     q: query,
     type,
@@ -172,12 +182,24 @@ export function searchDocuments(query: string, type: SearchType, page = 1, pageS
     pageSize: String(pageSize),
     tagMode,
   });
+  if (sortBy) {
+    params.set('sortBy', sortBy);
+  }
+  if (missingSent) {
+    params.set('missingSent', 'true');
+  }
   appendTags(params, tags);
   return apiFetch<SearchResult>(`/documents/search?${params.toString()}`);
 }
 
-export function getLatestDocuments(limit: 1 | 2 | 10, tags: DocumentTag[] = [], tagMode: TagMode = 'or') {
+export function getLatestDocuments(limit: 1 | 2 | 10, tags: DocumentTag[] = [], tagMode: TagMode = 'or', sortBy?: DocumentSortBy, missingSent = false) {
   const params = new URLSearchParams({ limit: String(limit), tagMode });
+  if (sortBy) {
+    params.set('sortBy', sortBy);
+  }
+  if (missingSent) {
+    params.set('missingSent', 'true');
+  }
   appendTags(params, tags);
   return apiFetch<SearchResult>(`/documents/latest?${params.toString()}`);
 }

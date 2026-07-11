@@ -1,4 +1,4 @@
-import { DocumentTag, SearchResult, SearchType, TagMode } from './api';
+import { DocumentSortBy, DocumentTag, SearchResult, SearchType, TagMode } from './api';
 
 const searchStateKey = 'my-document-store.search';
 
@@ -7,6 +7,8 @@ export interface PersistedSearchState {
   type: SearchType;
   tagFilters?: DocumentTag[];
   tagMode?: TagMode;
+  sortBy?: DocumentSortBy;
+  missingSent?: boolean;
   page: number;
   result: SearchResult;
 }

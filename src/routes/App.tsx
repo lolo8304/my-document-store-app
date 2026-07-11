@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileDown, FileText, SquarePen, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
+  DocumentSortBy,
   DocumentTag,
   DocumentTagOption,
   getLatestDocuments,
@@ -25,6 +26,7 @@ import { DynamicHeroIcon, hasHeroIconInput, resolveHeroIconName } from '../dynam
 const searchPageSize = 10;
 const noTagsFilterTag = 'no-symbol';
 const documentTagControlsKey = 'my-document-store.showDocumentTagControls';
+const defaultSortBy: DocumentSortBy = 'scanned';
 
 export default function App() {
   const navigate = useNavigate();
@@ -34,6 +36,8 @@ export default function App() {
   const [documentTags, setDocumentTags] = useState<DocumentTagOption[]>([]);
   const [tagFilters, setTagFilters] = useState<DocumentTag[]>(persistedSearch?.tagFilters ?? []);
   const [tagMode, setTagMode] = useState<TagMode>((persistedSearch?.tagFilters?.length ?? 0) > 1 ? persistedSearch?.tagMode ?? 'or' : 'or');
+  const [sortBy, setSortBy] = useState<DocumentSortBy>(persistedSearch?.sortBy ?? defaultSortBy);
+  const [missingSent, setMissingSent] = useState(persistedSearch?.missingSent ?? false);
   const [page, setPage] = useState(persistedSearch?.page ?? 1);
   const [result, setResult] = useState<SearchResult | undefined>(persistedSearch?.result);
   const [resultQuery, setResultQuery] = useState(persistedSearch?.query ?? '');
@@ -90,7 +94,16 @@ export default function App() {
     window.requestAnimationFrame(() => sentDateInputRef.current?.focus());
   }, [editingSentDateId]);
 
-  const runSearch = useCallback(async (nextPage = 1, append = false, nextTagFilters = tagFilters, queryOverride = query, nextTagMode = tagMode) => {
+  const runSearch = useCallback(
+    async (
+      nextPage = 1,
+      append = false,
+      nextTagFilters = tagFilters,
+      queryOverride = query,
+      nextTagMode = tagMode,
+      nextSortBy = sortBy,
+      nextMissingSent = missingSent,
+    ) => {
     const nextQuery = queryOverride.trim();
     const effectiveTagMode = nextTagFilters.length > 1 ? nextTagMode : 'or';
     const latestLimit = parseLatestQuery(nextQuery);
@@ -101,18 +114,22 @@ export default function App() {
       setLatestLoading(true);
       setError(undefined);
       try {
-        const response = await getLatestDocuments(latestLimit, nextTagFilters, effectiveTagMode);
+        const response = await getLatestDocuments(latestLimit, nextTagFilters, effectiveTagMode, nextSortBy, nextMissingSent);
         const latestResult = { ...response, total: response.items.length };
         setResult(latestResult);
         setResultQuery(nextQuery);
         setPage(1);
         setType('query');
         setTagMode(effectiveTagMode);
+        setSortBy(nextSortBy);
+        setMissingSent(nextMissingSent);
         writePersistedSearchState({
           query: nextQuery,
           type: 'query',
           tagFilters: nextTagFilters,
           tagMode: effectiveTagMode,
+          sortBy: nextSortBy,
+          missingSent: nextMissingSent,
           page: 1,
           result: latestResult,
         });
@@ -124,7 +141,7 @@ export default function App() {
       return;
     }
 
-    if (!nextQuery && nextTagFilters.length === 0) {
+    if (!nextQuery && nextTagFilters.length === 0 && !nextMissingSent) {
       setResult(undefined);
       clearPersistedSearchState();
       return;
@@ -138,18 +155,23 @@ export default function App() {
     }
     setError(undefined);
     try {
+      const effectiveQuery = nextQuery || 'all';
       const effectiveType = nextQuery && vectorSearchEnabled ? type : 'query';
-      const response = await searchDocuments(nextQuery, effectiveType, nextPage, searchPageSize, nextTagFilters, effectiveTagMode);
+      const response = await searchDocuments(effectiveQuery, effectiveType, nextPage, searchPageSize, nextTagFilters, effectiveTagMode, nextSortBy, nextMissingSent);
       const nextResult = append && result ? { ...response, items: [...result.items, ...response.items] } : response;
       setResult(nextResult);
-      setResultQuery(nextQuery);
+      setResultQuery(effectiveQuery);
       setPage(nextPage);
       setTagMode(effectiveTagMode);
+      setSortBy(nextSortBy);
+      setMissingSent(nextMissingSent);
       writePersistedSearchState({
-        query: nextQuery,
+        query: effectiveQuery,
         type: effectiveType,
         tagFilters: nextTagFilters,
         tagMode: effectiveTagMode,
+        sortBy: nextSortBy,
+        missingSent: nextMissingSent,
         page: nextPage,
         result: nextResult,
       });
@@ -163,7 +185,9 @@ export default function App() {
         setLoading(false);
       }
     }
-  }, [query, result, tagFilters, tagMode, type, vectorSearchEnabled]);
+    },
+    [missingSent, query, result, sortBy, tagFilters, tagMode, type, vectorSearchEnabled],
+  );
 
   async function runSync() {
     setSyncLoading(true);
@@ -177,13 +201,13 @@ export default function App() {
     }
   }
 
-  async function runLatest(limit: 1 | 2 | 10, nextTagFilters = tagFilters, nextTagMode = tagMode) {
+  async function runLatest(limit: 1 | 2 | 10, nextTagFilters = tagFilters, nextTagMode = tagMode, nextSortBy = sortBy, nextMissingSent = missingSent) {
     const effectiveTagMode = nextTagFilters.length > 1 ? nextTagMode : 'or';
     setEditedDocumentIds(new Set());
     setLatestLoading(true);
     setError(undefined);
     try {
-      const response = await getLatestDocuments(limit, nextTagFilters, effectiveTagMode);
+      const response = await getLatestDocuments(limit, nextTagFilters, effectiveTagMode, nextSortBy, nextMissingSent);
       const latestResult = { ...response, total: response.items.length };
       const nextQuery = limit === 1 ? 'last' : `last ${limit}`;
       setResult(latestResult);
@@ -192,11 +216,15 @@ export default function App() {
       setQuery(nextQuery);
       setType('query');
       setTagMode(effectiveTagMode);
+      setSortBy(nextSortBy);
+      setMissingSent(nextMissingSent);
       writePersistedSearchState({
         query: nextQuery,
         type: 'query',
         tagFilters: nextTagFilters,
         tagMode: effectiveTagMode,
+        sortBy: nextSortBy,
+        missingSent: nextMissingSent,
         page: 1,
         result: latestResult,
       });
@@ -226,6 +254,8 @@ export default function App() {
     setType('query');
     setTagFilters([]);
     setTagMode('or');
+    setSortBy(defaultSortBy);
+    setMissingSent(false);
     setPage(1);
     setResult(undefined);
     setResultQuery('');
@@ -243,7 +273,7 @@ export default function App() {
       void runLatest(latestLimit, nextTags, nextTagMode);
       return;
     }
-    if (query.trim() || nextTags.length > 0) {
+    if (query.trim() || nextTags.length > 0 || missingSent) {
       void runSearch(1, false, nextTags, query, nextTagMode);
       return;
     }
@@ -257,8 +287,10 @@ export default function App() {
     setEditedDocumentIds(new Set());
     setTagFilters([]);
     setTagMode('or');
+    setSortBy(defaultSortBy);
+    setMissingSent(false);
     setQuery('all');
-    void runSearch(1, false, [], 'all', 'or');
+    void runSearch(1, false, [], 'all', 'or', defaultSortBy, false);
   }
 
   function handleTagModeChange(nextTagMode: TagMode) {
@@ -273,7 +305,7 @@ export default function App() {
       void runLatest(latestLimit, tagFilters, nextTagMode);
       return;
     }
-    if (query.trim() || tagFilters.length > 0) {
+    if (query.trim() || tagFilters.length > 0 || missingSent) {
       void runSearch(1, false, tagFilters, query, nextTagMode);
     }
   }
@@ -284,6 +316,40 @@ export default function App() {
       localStorage.setItem(documentTagControlsKey, next ? 'true' : 'false');
       return next;
     });
+  }
+
+  function handleSortChange(nextSortBy: DocumentSortBy) {
+    setEditedDocumentIds(new Set());
+    const effectiveSortBy = nextSortBy === sortBy ? (nextSortBy === 'sent' ? 'scanned' : 'sent') : nextSortBy;
+    setSortBy(effectiveSortBy);
+    const nextQuery = query.trim() || resultQuery.trim() || 'all';
+    setQuery(nextQuery);
+    const latestLimit = parseLatestQuery(nextQuery);
+    if (latestLimit) {
+      void runLatest(latestLimit, tagFilters, tagMode, effectiveSortBy, missingSent);
+      return;
+    }
+    void runSearch(1, false, tagFilters, nextQuery, tagMode, effectiveSortBy, missingSent);
+  }
+
+  function handleMissingSentChange(nextMissingSent: boolean) {
+    setEditedDocumentIds(new Set());
+    setMissingSent(nextMissingSent);
+    const nextQuery = query.trim() || resultQuery.trim() || (nextMissingSent ? 'all' : '');
+    setQuery(nextQuery);
+    if (!nextQuery && tagFilters.length === 0) {
+      setResult(undefined);
+      setResultQuery('');
+      setPage(1);
+      clearPersistedSearchState();
+      return;
+    }
+    const latestLimit = parseLatestQuery(nextQuery);
+    if (latestLimit) {
+      void runLatest(latestLimit, tagFilters, tagMode, sortBy, nextMissingSent);
+      return;
+    }
+    void runSearch(1, false, tagFilters, nextQuery, tagMode, sortBy, nextMissingSent);
   }
 
   function startTitleEdit(documentId: string, title: string) {
@@ -335,6 +401,8 @@ export default function App() {
           type,
           tagFilters,
           tagMode,
+          sortBy,
+          missingSent,
           page,
           result: nextResult,
         });
@@ -396,6 +464,8 @@ export default function App() {
           type,
           tagFilters,
           tagMode,
+          sortBy,
+          missingSent,
           page,
           result: nextResult,
         });
@@ -438,6 +508,8 @@ export default function App() {
           type,
           tagFilters,
           tagMode,
+          sortBy,
+          missingSent,
           page,
           result: nextResult,
         });
@@ -487,12 +559,16 @@ export default function App() {
         documentTags={documentTags}
         tagFilters={tagFilters}
         tagMode={tagMode}
+        sortBy={sortBy}
+        missingSent={missingSent}
         showDocumentTagControls={showDocumentTagControls}
         vectorSearchEnabled={vectorSearchEnabled}
         onQueryChange={setQuery}
         onTypeChange={setType}
         onTagFiltersChange={handleTagFiltersChange}
         onTagModeChange={handleTagModeChange}
+        onSortChange={handleSortChange}
+        onMissingSentChange={handleMissingSentChange}
         onToggleDocumentTagControls={toggleDocumentTagControls}
         onAll={handleAll}
         onSubmit={() => void runSearch(1)}
@@ -628,7 +704,7 @@ export default function App() {
                         void saveSentDate(item.documentId, item.sentAt);
                       }}
                     >
-                      <span className="text-base text-stone-500">, sent:</span>
+                      <span className="text-base text-stone-500">sent:</span>
                       <input
                         ref={sentDateInputRef}
                         type="date"
@@ -672,9 +748,11 @@ export default function App() {
                       aria-label={`Edit sent date for ${title}`}
                       onClick={() => startSentDateEdit(item.documentId, item.sentAt, item.createdAt)}
                     >
-                      , sent: {item.sentAt ? formatSentDate(item.sentAt) : '-'}
+                      sent: {item.sentAt ? formatSentDate(item.sentAt) : '-'}
                     </button>
                   )}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
                   {showDocumentTagControls && (
                     <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1" aria-label={`Tags for ${title}`}>
                       {editedDocumentIds.has(item.documentId) && (
@@ -695,7 +773,7 @@ export default function App() {
                             aria-pressed={tagged}
                             disabled={tagSavingId === item.documentId}
                             onClick={() => void toggleDocumentTag(item.documentId, item.tags ?? [], tag.value)}
-                            className={`flex h-7 min-w-7 items-center justify-center rounded border px-1.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                            className={`flex h-7 min-w-7 items-center justify-center rounded border px-0.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
                               tagged ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-950 bg-white text-stone-950 hover:bg-stone-100'
                             }`}
                           >
@@ -739,7 +817,7 @@ export default function App() {
 function TagLabel({ tag }: { tag: DocumentTagOption }) {
   const iconName = resolveHeroIconName(tag.icon);
   if (iconName || hasHeroIconInput(tag.icon)) {
-    return <DynamicHeroIcon className="h-4 w-4" name={iconName ?? 'QuestionMarkCircleIcon'} aria-hidden="true" />;
+    return <DynamicHeroIcon className="h-6 w-6" name={iconName ?? 'QuestionMarkCircleIcon'} aria-hidden="true" />;
   }
   return tag.label;
 }
