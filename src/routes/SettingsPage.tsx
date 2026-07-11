@@ -5,9 +5,12 @@ import {
   createDocumentTagDefinition,
   deleteDocumentTagDefinition,
   DocumentTagDefinition,
+  SearchResultItem,
   getDocumentTagDefinitions,
   reorderDocumentTagDefinitions,
+  searchDocuments,
   updateDocumentTagDefinition,
+  updateDocumentTags,
 } from '../api';
 import { DynamicHeroIcon, hasHeroIconInput, resolveHeroIconName } from '../dynamic-icons';
 
@@ -102,9 +105,13 @@ export default function SettingsPage() {
 
     setError(undefined);
     try {
+      const documentsToMigrate = row.persisted && row.originalText !== nextText ? await findDocumentTagMigrationTargets(row.originalText) : [];
       const saved = row.persisted
         ? await updateDocumentTagDefinition(row.id, nextShort, nextText, nextIcon)
         : await createDocumentTagDefinition(nextShort, nextText, nextIcon);
+      if (row.persisted && row.originalText !== nextText) {
+        await migrateDocumentTag(documentsToMigrate, row.originalText, nextText);
+      }
       setRows((current) => withEmptyRows(current.map((item) => (item.id === row.id ? toRow(saved) : item))));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save tag');
@@ -359,6 +366,29 @@ function movePersistedRow(rows: TagRow[], movingId: string, targetId: string) {
   const [movingRow] = nextPersistedRows.splice(movingIndex, 1);
   nextPersistedRows.splice(targetIndex, 0, movingRow);
   return [...nextPersistedRows, ...draftRows];
+}
+
+async function findDocumentTagMigrationTargets(previousTag: string) {
+  const pageSize = 100;
+  const documents: SearchResultItem[] = [];
+
+  for (let page = 1; ; page += 1) {
+    const result = await searchDocuments('all', 'query', page, pageSize, [previousTag], 'or');
+    documents.push(...result.items.filter((item) => item.tags.includes(previousTag)));
+    if (documents.length >= result.total || result.items.length === 0) {
+      return documents;
+    }
+  }
+}
+
+async function migrateDocumentTag(documents: SearchResultItem[], previousTag: string, nextTag: string) {
+  for (const document of documents) {
+    await updateDocumentTags(document.documentId, replaceDocumentTag(document.tags, previousTag, nextTag));
+  }
+}
+
+function replaceDocumentTag(tags: string[], previousTag: string, nextTag: string) {
+  return Array.from(new Set(tags.map((tag) => (tag === previousTag ? nextTag : tag))));
 }
 
 function IconPreview({ value }: { value: string }) {

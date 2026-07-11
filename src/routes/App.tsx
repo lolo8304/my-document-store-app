@@ -22,7 +22,6 @@ import { useSyncProgress } from '../useSyncProgress';
 import { DynamicHeroIcon, hasHeroIconInput, resolveHeroIconName } from '../dynamic-icons';
 
 const searchPageSize = 10;
-const trashTag = 'trash';
 const noTagsFilterTag = 'no-symbol';
 const documentTagControlsKey = 'my-document-store.showDocumentTagControls';
 
@@ -49,6 +48,7 @@ export default function App() {
   const [titleError, setTitleError] = useState<{ documentId: string; message: string } | undefined>();
   const [tagSavingId, setTagSavingId] = useState<string | undefined>();
   const [tagError, setTagError] = useState<{ documentId: string; message: string } | undefined>();
+  const [editedDocumentIds, setEditedDocumentIds] = useState<Set<string>>(() => new Set());
   const [vectorSearchEnabled, setVectorSearchEnabled] = useState(false);
   const [showDocumentTagControls, setShowDocumentTagControls] = useState(readDocumentTagControlsPreference);
   const loadingMoreRef = useRef(false);
@@ -81,6 +81,9 @@ export default function App() {
     const nextQuery = queryOverride.trim();
     const effectiveTagMode = nextTagFilters.length > 1 ? nextTagMode : 'or';
     const latestLimit = parseLatestQuery(nextQuery);
+    if (!append) {
+      setEditedDocumentIds(new Set());
+    }
     if (latestLimit) {
       setLatestLoading(true);
       setError(undefined);
@@ -163,6 +166,7 @@ export default function App() {
 
   async function runLatest(limit: 1 | 2 | 10, nextTagFilters = tagFilters, nextTagMode = tagMode) {
     const effectiveTagMode = nextTagFilters.length > 1 ? nextTagMode : 'or';
+    setEditedDocumentIds(new Set());
     setLatestLoading(true);
     setError(undefined);
     try {
@@ -203,6 +207,7 @@ export default function App() {
   }
 
   function resetSearch() {
+    setEditedDocumentIds(new Set());
     clearPersistedSearchState();
     setQuery('');
     setType('query');
@@ -216,6 +221,7 @@ export default function App() {
   }
 
   function handleTagFiltersChange(nextTags: DocumentTag[]) {
+    setEditedDocumentIds(new Set());
     const nextTagMode = nextTags.length > 1 ? tagMode : 'or';
     setTagFilters(nextTags);
     setTagMode(nextTagMode);
@@ -235,6 +241,7 @@ export default function App() {
   }
 
   function handleAll() {
+    setEditedDocumentIds(new Set());
     setTagFilters([]);
     setTagMode('or');
     setQuery('all');
@@ -246,6 +253,7 @@ export default function App() {
       return;
     }
 
+    setEditedDocumentIds(new Set());
     setTagMode(nextTagMode);
     const latestLimit = parseLatestQuery(query);
     if (latestLimit) {
@@ -296,6 +304,11 @@ export default function App() {
     setTitleError(undefined);
     try {
       const response = await updateDocumentTitle(documentId, nextTitle);
+      setEditedDocumentIds((current) => {
+        const next = new Set(current);
+        next.add(documentId);
+        return next;
+      });
       setResult((current) => {
         if (!current) {
           return current;
@@ -333,22 +346,14 @@ export default function App() {
     setTagError(undefined);
     try {
       const response = await updateDocumentTags(documentId, nextTags);
+      setEditedDocumentIds((current) => {
+        const next = new Set(current);
+        next.add(documentId);
+        return next;
+      });
       setResult((current) => {
         if (!current) {
           return current;
-        }
-        if (!matchesActiveTagFilters(response.tags, tagFilters, tagMode)) {
-          const nextItems = current.items.filter((item) => item.documentId !== documentId);
-          const nextResult = { ...current, items: nextItems, total: Math.max(0, current.total - 1) };
-          writePersistedSearchState({
-            query: resultQuery,
-            type,
-            tagFilters,
-            tagMode,
-            page,
-            result: nextResult,
-          });
-          return nextResult;
         }
         const nextResult = {
           ...current,
@@ -543,6 +548,13 @@ export default function App() {
                   <p className="text-base text-stone-500">{formatDate(item.modifiedAt ?? item.createdAt)}</p>
                   {showDocumentTagControls && (
                     <div className="flex items-center gap-1" aria-label={`Tags for ${title}`}>
+                      {editedDocumentIds.has(item.documentId) && (
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600"
+                          title="Edited since last search"
+                          aria-label="Edited since last search"
+                        />
+                      )}
                       {documentTags.filter(isAssignableDocumentTag).map((tag) => {
                         const tagged = item.tags?.includes(tag.value) ?? false;
                         return (
@@ -616,23 +628,6 @@ function isAssignableDocumentTag(tag: DocumentTagOption) {
 
 function readDocumentTagControlsPreference() {
   return localStorage.getItem(documentTagControlsKey) === 'true';
-}
-
-function matchesActiveTagFilters(documentTags: DocumentTag[], tagFilters: DocumentTag[], tagMode: TagMode) {
-  if (tagFilters.includes(noTagsFilterTag)) {
-    return documentTags.length === 0;
-  }
-  const hasTrashFilter = tagFilters.includes(trashTag);
-  const hasTrash = documentTags.includes(trashTag);
-  if (hasTrashFilter !== hasTrash) {
-    return false;
-  }
-
-  const effectiveFilters = tagFilters.filter((tag) => tag !== trashTag && tag !== noTagsFilterTag);
-  if (effectiveFilters.length === 0) {
-    return !hasTrash;
-  }
-  return tagMode === 'and' ? effectiveFilters.every((tag) => documentTags.includes(tag)) : effectiveFilters.some((tag) => documentTags.includes(tag));
 }
 
 function missingTerms(query: string, matchedTerms: string[]) {
