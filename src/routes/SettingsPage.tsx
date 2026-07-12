@@ -342,7 +342,7 @@ function withEmptyRows(rows: TagRow[]): TagRow[] {
 
 function emptyRow(): TagRow {
   return {
-    id: `new-${crypto.randomUUID()}`,
+    id: `new-${createDraftId()}`,
     short: '',
     text: '',
     icon: '',
@@ -351,6 +351,13 @@ function emptyRow(): TagRow {
     originalIcon: '',
     persisted: false,
   };
+}
+
+function createDraftId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function movePersistedRow(rows: TagRow[], movingId: string, targetId: string) {

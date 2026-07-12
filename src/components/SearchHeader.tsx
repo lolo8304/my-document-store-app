@@ -139,7 +139,7 @@ export function SearchHeader({
 
   return (
     <section className="border-b border-stone-200 bg-white">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-3 px-4 pb-4 pt-0">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-1 px-4 pb-1 pt-0">
         <div>
           <div className="flex items-start justify-between gap-3">
             <button
@@ -174,7 +174,7 @@ export function SearchHeader({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-2">
           <div className="flex items-center gap-3">
             <div className="flex h-12 min-w-0 flex-1 items-center gap-2 rounded border border-stone-300 bg-white px-2 shadow-sm focus-within:border-stone-900 sm:px-3">
               <Search className="h-5 w-5 shrink-0 text-stone-500 sm:h-6 sm:w-6" aria-hidden="true" />

@@ -548,7 +548,7 @@ export default function App() {
   }, [hasMoreResults, loading, loadingMore, page, runSearch]);
 
   return (
-    <main className="min-h-screen bg-stone-50 text-stone-950">
+    <main className="flex h-screen flex-col overflow-hidden bg-stone-50 text-stone-950">
       <SearchHeader
         query={query}
         type={type}
@@ -578,237 +578,239 @@ export default function App() {
         onStopSync={() => void runStopSync()}
       />
 
-      <section className="mx-auto w-full max-w-5xl">
+      <section className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col">
         {error && <div className="rounded border border-red-200 bg-red-50 p-4 text-lg text-red-800">{error}</div>}
 
-        {result && (
-          <div className="flex items-center justify-between p-4 text-lg text-stone-600">
-            <span>
-              {result.total} result{result.total === 1 ? '' : 's'}
-            </span>
-            <span>
-              {result.items.length} / {result.total} shown
-            </span>
-          </div>
-        )}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {result && (
+            <div className="flex items-center justify-between px-4 py-2 text-base text-stone-600">
+              <span>
+                {result.total} result{result.total === 1 ? '' : 's'}
+              </span>
+              <span>
+                {result.items.length} / {result.total} shown
+              </span>
+            </div>
+          )}
 
-        <div className="divide-y divide-stone-200 border-y border-stone-200 bg-white">
-          {result?.items.map((item) => {
-            const itemMissingTerms = missingTerms(resultQuery, item.matchedTerms);
-            const title = item.title ?? item.fileName;
-            return (
-              <article
-                key={item.documentId}
-                className="p-4"
-              >
-                <div>
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
-                    <div className="min-w-0">
-                      {editingTitleId === item.documentId ? (
-                        <form
-                          className="flex min-w-0 items-start gap-2"
-                          onSubmit={(event) => {
-                            event.preventDefault();
-                            void saveTitle(item.documentId, title);
-                          }}
-                        >
-                          <input
-                            className="min-w-0 flex-1 rounded border border-stone-300 bg-white px-2 py-1 text-xl font-semibold text-stone-950 outline-none focus:border-stone-500 disabled:bg-stone-100"
-                            value={titleDraft}
-                            disabled={titleSavingId === item.documentId}
-                            autoFocus
-                            aria-label={`Edit title for ${title}`}
-                            onChange={(event) => setTitleDraft(event.target.value)}
-                            onBlur={() => void saveTitle(item.documentId, title)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Escape') {
+          <div className="divide-y divide-stone-200 border-y border-stone-200 bg-white">
+            {result?.items.map((item) => {
+              const itemMissingTerms = missingTerms(resultQuery, item.matchedTerms);
+              const title = item.title ?? item.fileName;
+              return (
+                <article
+                  key={item.documentId}
+                  className="p-4"
+                >
+                  <div>
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-3">
+                      <div className="min-w-0">
+                        {editingTitleId === item.documentId ? (
+                          <form
+                            className="flex min-w-0 items-start gap-2"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              void saveTitle(item.documentId, title);
+                            }}
+                          >
+                            <input
+                              className="min-w-0 flex-1 rounded border border-stone-300 bg-white px-2 py-1 text-xl font-semibold text-stone-950 outline-none focus:border-stone-500 disabled:bg-stone-100"
+                              value={titleDraft}
+                              disabled={titleSavingId === item.documentId}
+                              autoFocus
+                              aria-label={`Edit title for ${title}`}
+                              onChange={(event) => setTitleDraft(event.target.value)}
+                              onBlur={() => void saveTitle(item.documentId, title)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Escape') {
+                                  event.preventDefault();
+                                  cancelTitleEdit();
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                              title="Cancel edit"
+                              aria-label={`Cancel title edit for ${title}`}
+                              onMouseDown={(event) => {
                                 event.preventDefault();
                                 cancelTitleEdit();
-                              }
-                            }}
-                          />
-                          <button
-                            type="button"
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
-                            title="Cancel edit"
-                            aria-label={`Cancel title edit for ${title}`}
-                            onMouseDown={(event) => {
-                              event.preventDefault();
-                              cancelTitleEdit();
-                            }}
+                              }}
+                            >
+                              <X className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </form>
+                        ) : (
+                          <div className="flex min-w-0 items-start gap-2">
+                            <button
+                              type="button"
+                              className="min-w-0 flex-1 break-words text-left text-xl font-semibold text-stone-950 hover:text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
+                              title="Edit title"
+                              aria-label={`Edit title for ${title}`}
+                              onClick={() => startTitleEdit(item.documentId, title)}
+                              onFocus={() => startTitleEdit(item.documentId, title)}
+                            >
+                              {title}
+                            </button>
+                            <button
+                              type="button"
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                              title="Edit title"
+                              aria-label={`Edit title for ${title}`}
+                              onClick={() => startTitleEdit(item.documentId, title)}
+                            >
+                              <SquarePen className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
+                        )}
+                        {titleError?.documentId === item.documentId && (
+                          <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{titleError.message}</div>
+                        )}
+                      </div>
+                      {item.language && <span className="shrink-0 text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
+                      <div className="flex shrink-0 justify-end gap-2">
+                        {item.pdfUrl && (
+                          <a
+                            className="flex h-8 w-8 items-center justify-center rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-900"
+                            href={item.pdfUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Open PDF"
+                            aria-label={`Open PDF for ${title}`}
+                            onClick={(event) => event.stopPropagation()}
                           >
-                            <X className="h-4 w-4" aria-hidden="true" />
-                          </button>
-                        </form>
-                      ) : (
-                        <div className="flex min-w-0 items-start gap-2">
-                          <button
-                            type="button"
-                            className="min-w-0 flex-1 break-words text-left text-xl font-semibold text-stone-950 hover:text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
-                            title="Edit title"
-                            aria-label={`Edit title for ${title}`}
-                            onClick={() => startTitleEdit(item.documentId, title)}
-                            onFocus={() => startTitleEdit(item.documentId, title)}
-                          >
-                            {title}
-                          </button>
-                          <button
-                            type="button"
-                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
-                            title="Edit title"
-                            aria-label={`Edit title for ${title}`}
-                            onClick={() => startTitleEdit(item.documentId, title)}
-                          >
-                            <SquarePen className="h-4 w-4" aria-hidden="true" />
-                          </button>
-                        </div>
-                      )}
-                      {titleError?.documentId === item.documentId && (
-                        <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{titleError.message}</div>
-                      )}
-                    </div>
-                    {item.language && <span className="shrink-0 text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
-                    <div className="flex shrink-0 justify-end gap-2">
-                      {item.pdfUrl && (
-                        <a
-                          className="flex h-8 w-8 items-center justify-center rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-900"
-                          href={item.pdfUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          title="Open PDF"
-                          aria-label={`Open PDF for ${title}`}
+                            <FileDown className="h-5 w-5" aria-hidden="true" />
+                          </a>
+                        )}
+                        <Link
+                          className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                          to={`/documents/${item.documentId}/text`}
+                          title="Open text"
+                          aria-label={`Open text for ${title}`}
                           onClick={(event) => event.stopPropagation()}
                         >
-                          <FileDown className="h-5 w-5" aria-hidden="true" />
-                        </a>
-                      )}
-                      <Link
-                        className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
-                        to={`/documents/${item.documentId}/text`}
-                        title="Open text"
-                        aria-label={`Open text for ${title}`}
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <FileText className="h-5 w-5" aria-hidden="true" />
-                      </Link>
+                          <FileText className="h-5 w-5" aria-hidden="true" />
+                        </Link>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <p className="text-base text-stone-500">scanned: {formatDate(item.modifiedAt ?? item.createdAt)}</p>
-                  {editingSentDateId === item.documentId ? (
-                    <form
-                      className="flex items-center gap-1"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        void saveSentDate(item.documentId, item.sentAt);
-                      }}
-                    >
-                      <span className="text-base text-stone-500">sent:</span>
-                      <input
-                        ref={sentDateInputRef}
-                        type="date"
-                        value={sentDateDraft}
-                        disabled={sentDateSavingId === item.documentId}
-                        className="h-8 rounded border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-stone-900 disabled:cursor-not-allowed disabled:text-stone-300"
-                        aria-label={`Sent date for ${title}`}
-                        onChange={(event) => setSentDateDraft(event.target.value)}
-                        onBlur={() => void saveSentDate(item.documentId, item.sentAt)}
-                        onClick={(event) => event.stopPropagation()}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            void saveSentDate(item.documentId, item.sentAt);
-                            return;
-                          }
-                          if (event.key === 'Escape') {
-                            event.preventDefault();
-                            cancelSentDateEdit();
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
-                        title="Cancel sent date edit"
-                        aria-label={`Cancel sent date edit for ${title}`}
-                        onMouseDown={(event) => {
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <p className="text-base text-stone-500">scanned: {formatDate(item.modifiedAt ?? item.createdAt)}</p>
+                    {editingSentDateId === item.documentId ? (
+                      <form
+                        className="flex items-center gap-1"
+                        onSubmit={(event) => {
                           event.preventDefault();
-                          cancelSentDateEdit();
+                          void saveSentDate(item.documentId, item.sentAt);
                         }}
                       >
-                        <X className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </form>
-                  ) : (
-                    <button
-                      type="button"
-                      className="text-base text-stone-500 hover:text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
-                      title="Edit sent date"
-                      aria-label={`Edit sent date for ${title}`}
-                      onClick={() => startSentDateEdit(item.documentId, item.sentAt, item.createdAt)}
-                    >
-                      sent: {item.sentAt ? formatSentDate(item.sentAt) : '-'}
-                    </button>
-                  )}
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  {showDocumentTagControls && (
-                    <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1" aria-label={`Tags for ${title}`}>
-                      {editedDocumentIds.has(item.documentId) && (
-                        <span
-                          className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600"
-                          title="Edited since last search"
-                          aria-label="Edited since last search"
+                        <span className="text-base text-stone-500">sent:</span>
+                        <input
+                          ref={sentDateInputRef}
+                          type="date"
+                          value={sentDateDraft}
+                          disabled={sentDateSavingId === item.documentId}
+                          className="h-8 rounded border border-stone-300 bg-white px-2 text-sm text-stone-700 outline-none focus:border-stone-900 disabled:cursor-not-allowed disabled:text-stone-300"
+                          aria-label={`Sent date for ${title}`}
+                          onChange={(event) => setSentDateDraft(event.target.value)}
+                          onBlur={() => void saveSentDate(item.documentId, item.sentAt)}
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              void saveSentDate(item.documentId, item.sentAt);
+                              return;
+                            }
+                            if (event.key === 'Escape') {
+                              event.preventDefault();
+                              cancelSentDateEdit();
+                            }
+                          }}
                         />
-                      )}
-                      {documentTags.filter(isAssignableDocumentTag).map((tag) => {
-                        const tagged = item.tags?.includes(tag.value) ?? false;
-                        return (
-                          <button
-                            key={tag.value}
-                            type="button"
-                            title={tag.name}
-                            aria-label={`${tagged ? 'Remove' : 'Add'} ${tag.name} tag for ${title}`}
-                            aria-pressed={tagged}
-                            disabled={tagSavingId === item.documentId}
-                            onClick={() => void toggleDocumentTag(item.documentId, item.tags ?? [], tag.value)}
-                            className={`flex h-7 min-w-7 items-center justify-center rounded border px-0.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
-                              tagged ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-950 bg-white text-stone-950 hover:bg-stone-100'
-                            }`}
-                          >
-                            <TagLabel tag={tag} />
-                          </button>
-                        );
-                      })}
-                    </div>
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950"
+                          title="Cancel sent date edit"
+                          aria-label={`Cancel sent date edit for ${title}`}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            cancelSentDateEdit();
+                          }}
+                        >
+                          <X className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </form>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-base text-stone-500 hover:text-stone-800 focus:outline-none focus:ring-2 focus:ring-stone-400 focus:ring-offset-2"
+                        title="Edit sent date"
+                        aria-label={`Edit sent date for ${title}`}
+                        onClick={() => startSentDateEdit(item.documentId, item.sentAt, item.createdAt)}
+                      >
+                        sent: {item.sentAt ? formatSentDate(item.sentAt) : '-'}
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    {showDocumentTagControls && (
+                      <div className="flex min-w-0 max-w-full flex-wrap items-center gap-1" aria-label={`Tags for ${title}`}>
+                        {editedDocumentIds.has(item.documentId) && (
+                          <span
+                            className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-600"
+                            title="Edited since last search"
+                            aria-label="Edited since last search"
+                          />
+                        )}
+                        {documentTags.filter(isAssignableDocumentTag).map((tag) => {
+                          const tagged = item.tags?.includes(tag.value) ?? false;
+                          return (
+                            <button
+                              key={tag.value}
+                              type="button"
+                              title={tag.name}
+                              aria-label={`${tagged ? 'Remove' : 'Add'} ${tag.name} tag for ${title}`}
+                              aria-pressed={tagged}
+                              disabled={tagSavingId === item.documentId}
+                              onClick={() => void toggleDocumentTag(item.documentId, item.tags ?? [], tag.value)}
+                              className={`flex h-7 min-w-7 items-center justify-center rounded border px-0.5 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+                                tagged ? 'border-stone-950 bg-stone-950 text-white' : 'border-stone-950 bg-white text-stone-950 hover:bg-stone-100'
+                              }`}
+                            >
+                              <TagLabel tag={tag} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  {sentDateError?.documentId === item.documentId && (
+                    <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{sentDateError.message}</div>
                   )}
-                </div>
-                {sentDateError?.documentId === item.documentId && (
-                  <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{sentDateError.message}</div>
-                )}
-                {showDocumentTagControls && tagError?.documentId === item.documentId && (
-                  <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{tagError.message}</div>
-                )}
-                {itemMissingTerms.length > 0 && (
-                  <p className="mt-1 text-sm text-stone-400">
-                    {itemMissingTerms.map((term) => (
-                      <span key={term} className="mr-2 line-through">
-                        {term}
-                      </span>
-                    ))}
+                  {showDocumentTagControls && tagError?.documentId === item.documentId && (
+                    <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-sm text-red-800">{tagError.message}</div>
+                  )}
+                  {itemMissingTerms.length > 0 && (
+                    <p className="mt-1 text-sm text-stone-400">
+                      {itemMissingTerms.map((term) => (
+                        <span key={term} className="mr-2 line-through">
+                          {term}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+                  <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
+                    <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
                   </p>
-                )}
-                <p className="mt-2 max-w-4xl text-l leading-6 text-stone-700">
-                  <HighlightedText text={item.excerpt} terms={item.matchedTerms} />
-                </p>
-              </article>
-            );
-          })}
-        </div>
+                </article>
+              );
+            })}
+          </div>
 
-        <div id="search-scroll-sentinel" className="h-10" />
-        {loadingMore && <div className="mt-3 text-center text-lg text-stone-500">Loading more results</div>}
+          <div id="search-scroll-sentinel" className="h-10" />
+          {loadingMore && <div className="mt-3 text-center text-lg text-stone-500">Loading more results</div>}
+        </div>
       </section>
     </main>
   );
