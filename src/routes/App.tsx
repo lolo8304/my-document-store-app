@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { FileDown, FileText, SquarePen, X } from 'lucide-react';
+import { FileDown, FileText, RefreshCw, SquarePen, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   DocumentSortBy,
   DocumentTag,
   DocumentTagOption,
   getLatestDocuments,
+  reprocessDocumentOcr,
   getSettings,
   searchDocuments,
   SearchResult,
@@ -46,6 +47,7 @@ export default function App() {
   const [latestLoading, setLatestLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [stopSyncLoading, setStopSyncLoading] = useState(false);
+  const [reprocessOcrId, setReprocessOcrId] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const [editingTitleId, setEditingTitleId] = useState<string | undefined>();
   const [titleDraft, setTitleDraft] = useState('');
@@ -198,6 +200,18 @@ export default function App() {
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
       setSyncLoading(false);
+    }
+  }
+
+  async function runReprocessOcr(documentId: string) {
+    setReprocessOcrId(documentId);
+    setError(undefined);
+    try {
+      await reprocessDocumentOcr(documentId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Re-OCR failed');
+    } finally {
+      setReprocessOcrId(undefined);
     }
   }
 
@@ -670,6 +684,19 @@ export default function App() {
                       </div>
                       {item.language && <span className="shrink-0 text-lg font-medium text-stone-400">{languageLabel(item.language)}</span>}
                       <div className="flex shrink-0 justify-end gap-2">
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-stone-100"
+                          title="Re-OCR document"
+                          aria-label={`Re-OCR ${title}`}
+                          disabled={syncProgress.running || reprocessOcrId === item.documentId}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void runReprocessOcr(item.documentId);
+                          }}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${reprocessOcrId === item.documentId ? 'animate-spin' : ''}`} aria-hidden="true" />
+                        </button>
                         {item.pdfUrl && (
                           <a
                             className="flex h-8 w-8 items-center justify-center rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-900"

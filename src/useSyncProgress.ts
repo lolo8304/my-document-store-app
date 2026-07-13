@@ -33,6 +33,9 @@ export function useSyncProgress() {
           phase: status.sync.phase,
           fileName: status.sync.fileName,
           fileElapsedSeconds: status.sync.fileElapsedSeconds,
+          stepCurrent: status.sync.stepCurrent,
+          stepTotal: status.sync.stepTotal,
+          stepUnit: status.sync.stepUnit,
           startedAt: status.sync.startedAt,
         }));
       })

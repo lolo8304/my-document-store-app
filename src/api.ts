@@ -29,6 +29,15 @@ export interface SearchResultItem {
   modifiedAt?: string;
   sentAt?: string;
   hasSentDate: boolean;
+  sender?: string;
+  recipient?: string;
+  subject?: string;
+  referenceNumber?: string;
+  invoiceNumber?: string;
+  customerNumber?: string;
+  accountNumber?: string;
+  deadlineAt?: string;
+  paymentDueAt?: string;
   excerpt: string;
   matchedTerms: string[];
   textUrl: string;
@@ -48,6 +57,17 @@ export interface FullTextResult {
   title: string;
   fileName: string;
   tags: DocumentTag[];
+  sentAt?: string;
+  hasSentDate: boolean;
+  sender?: string;
+  recipient?: string;
+  subject?: string;
+  referenceNumber?: string;
+  invoiceNumber?: string;
+  customerNumber?: string;
+  accountNumber?: string;
+  deadlineAt?: string;
+  paymentDueAt?: string;
   text: string;
 }
 
@@ -75,6 +95,11 @@ export interface StopSyncResult {
   stopRequested: boolean;
 }
 
+export interface ReprocessOcrResult {
+  documentId: string;
+  started: boolean;
+}
+
 export interface SyncProgress {
   running: boolean;
   current: number;
@@ -87,6 +112,9 @@ export interface SyncProgress {
   phase?: 'idle' | 'listing' | 'checking' | 'downloading' | 'extracting' | 'spellchecking' | 'embedding' | 'storing' | 'deleting';
   fileName?: string;
   fileElapsedSeconds?: number;
+  stepCurrent?: number;
+  stepTotal?: number;
+  stepUnit?: 'page' | 'chunk';
   startedAt?: string;
   error?: string;
 }
@@ -104,6 +132,9 @@ export interface AdminStatus {
     phase?: SyncProgress['phase'];
     fileName?: string;
     fileElapsedSeconds?: number;
+    stepCurrent?: number;
+    stepTotal?: number;
+    stepUnit?: SyncProgress['stepUnit'];
   };
 }
 
@@ -214,6 +245,10 @@ export function syncDropbox() {
 
 export function stopDropboxSync() {
   return apiPost<StopSyncResult>('/admin/sync/stop');
+}
+
+export function reprocessDocumentOcr(id: string) {
+  return apiPost<ReprocessOcrResult>(`/documents/${id}/reprocess-ocr`);
 }
 
 export function getAdminStatus() {

@@ -21,6 +21,9 @@ interface SearchHeaderProps {
     phase?: string;
     fileName?: string;
     fileElapsedSeconds?: number;
+    stepCurrent?: number;
+    stepTotal?: number;
+    stepUnit?: 'page' | 'chunk';
   };
   documentTags: DocumentTagOption[];
   tagFilters: DocumentTag[];
@@ -348,11 +351,16 @@ export function SearchHeader({
             </span>
             {syncProgress?.running && syncProgress.total > 0 && (
               <span className="h-8 rounded border border-transparent px-2 text-sm leading-8 tabular-nums">
-                {syncProgress.current} / {syncProgress.total}
+                {syncDisplayCurrent(syncProgress)} / {syncProgress.total}
               </span>
             )}
             {syncProgress?.running && syncProgress.phase && syncProgress.phase !== 'idle' && (
               <span className="h-8 rounded border border-transparent px-2 text-sm leading-8">{phaseLabel(syncProgress.phase)}</span>
+            )}
+            {syncProgress?.running && syncProgress.stepCurrent !== undefined && syncProgress.stepTotal !== undefined && syncProgress.stepUnit && (
+              <span className="h-8 rounded border border-transparent px-2 text-sm leading-8 tabular-nums">
+                {stepProgressLabel(syncProgress.stepUnit)} {syncProgress.stepCurrent} / {syncProgress.stepTotal}
+              </span>
             )}
             {syncProgress?.running && syncProgress.fileName && (
               <span className="h-8 min-w-0 max-w-full truncate rounded border border-transparent px-2 text-sm leading-8 text-stone-500 sm:max-w-md" title={syncProgress.fileName}>
@@ -399,6 +407,19 @@ function phaseLabel(phase: string) {
     deleting: 'Cleanup',
   };
   return labels[phase] ?? phase;
+}
+
+function syncDisplayCurrent(syncProgress: NonNullable<SearchHeaderProps['syncProgress']>) {
+  const activeFilePhases = new Set(['downloading', 'extracting', 'spellchecking', 'embedding', 'storing']);
+  if (syncProgress.fileName && syncProgress.phase && activeFilePhases.has(syncProgress.phase)) {
+    return Math.min(syncProgress.current + 1, syncProgress.total);
+  }
+
+  return syncProgress.current;
+}
+
+function stepProgressLabel(unit: NonNullable<NonNullable<SearchHeaderProps['syncProgress']>['stepUnit']>) {
+  return unit === 'page' ? 'Page' : 'Chunk';
 }
 
 function syncStatusText(syncProgress: SearchHeaderProps['syncProgress'], syncLoading: boolean, hideCompletedStatus: boolean) {

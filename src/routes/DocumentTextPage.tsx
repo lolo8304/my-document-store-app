@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, FileDown, FileText, SquarePen, X } from 'lucide-react';
+import { ArrowLeft, FileDown, FileText, RefreshCw, SquarePen, X } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   DocumentTag,
@@ -8,6 +8,7 @@ import {
   getLatestDocuments,
   getPdfLink,
   getSettings,
+  reprocessDocumentOcr,
   searchDocuments,
   SearchType,
   TagMode,
@@ -38,11 +39,13 @@ export default function DocumentTextPage() {
   const [titleSaving, setTitleSaving] = useState(false);
   const [titleError, setTitleError] = useState<string | undefined>();
   const [text, setText] = useState('');
+  const [capturedMetadata, setCapturedMetadata] = useState<CapturedMetadata>({});
   const [pdfUrl, setPdfUrl] = useState<string | undefined>();
   const [loading, setLoading] = useState(true);
   const [latestLoading, setLatestLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [stopSyncLoading, setStopSyncLoading] = useState(false);
+  const [reprocessOcrLoading, setReprocessOcrLoading] = useState(false);
   const [vectorSearchEnabled, setVectorSearchEnabled] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [statusMessage, setStatusMessage] = useState<string | undefined>();
@@ -89,6 +92,18 @@ export default function DocumentTextPage() {
         setDocumentTitle(textResponse.title ?? textResponse.fileName);
         setTitleDraft(textResponse.title ?? textResponse.fileName);
         setText(textResponse.text);
+        setCapturedMetadata({
+          sender: textResponse.sender,
+          recipient: textResponse.recipient,
+          sentAt: textResponse.sentAt,
+          subject: textResponse.subject,
+          referenceNumber: textResponse.referenceNumber,
+          invoiceNumber: textResponse.invoiceNumber,
+          customerNumber: textResponse.customerNumber,
+          accountNumber: textResponse.accountNumber,
+          deadlineAt: textResponse.deadlineAt,
+          paymentDueAt: textResponse.paymentDueAt,
+        });
         setPdfUrl(linkResponse.pdfUrl);
       })
       .catch((err) => {
@@ -160,6 +175,23 @@ export default function DocumentTextPage() {
       setError(err instanceof Error ? err.message : 'Sync failed');
     } finally {
       setSyncLoading(false);
+    }
+  }
+
+  async function runReprocessOcr() {
+    if (!id) {
+      return;
+    }
+    setReprocessOcrLoading(true);
+    setError(undefined);
+    setStatusMessage(undefined);
+    try {
+      await reprocessDocumentOcr(id);
+      setStatusMessage('Re-OCR started. Check the status icon for progress.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Re-OCR failed');
+    } finally {
+      setReprocessOcrLoading(false);
     }
   }
 
@@ -375,6 +407,16 @@ export default function DocumentTextPage() {
             <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="flex shrink-0 justify-end gap-2">
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center rounded border border-stone-300 bg-stone-100 text-stone-700 hover:bg-white hover:text-stone-950 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-stone-100"
+              title="Re-OCR document"
+              aria-label="Re-OCR document"
+              disabled={syncProgress.running || reprocessOcrLoading}
+              onClick={() => void runReprocessOcr()}
+            >
+              <RefreshCw className={`h-4 w-4 ${reprocessOcrLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
+            </button>
             {pdfUrl && (
               <a
                 className="flex h-8 w-8 items-center justify-center rounded border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-900"
@@ -464,6 +506,18 @@ export default function DocumentTextPage() {
         )}
         {loading && <div className="text-lg text-stone-600">Loading document text</div>}
         {error && <div className="rounded border border-red-200 bg-red-50 p-4 text-lg text-red-800">{error}</div>}
+        {!loading && !error && metadataRows(capturedMetadata).length > 0 && (
+          <section className="mb-4 border-y border-stone-200 bg-stone-50 p-4">
+            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              {metadataRows(capturedMetadata).map(({ key, label, value }) => (
+                <div key={key} className="min-w-0">
+                  <dt className="text-xs font-semibold uppercase text-stone-500">{label}</dt>
+                  <dd className={`mt-1 break-words text-sm text-stone-900 ${key === 'sender' || key === 'recipient' ? 'whitespace-pre-wrap' : ''}`}>{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
         {!loading && !error && (
           <div className="max-w-full overflow-x-hidden whitespace-pre-wrap break-words border-y border-stone-200 bg-white p-4 font-mono text-sm leading-7 text-stone-800 [overflow-wrap:anywhere]">
             <HighlightedText text={text} terms={highlightTerms} />
@@ -488,6 +542,34 @@ function updatePersistedDocumentTitle(documentId: string, title: string) {
       items: state.result.items.map((item) => (item.documentId === documentId ? { ...item, title } : item)),
     },
   });
+}
+
+interface CapturedMetadata {
+  sender?: string;
+  recipient?: string;
+  sentAt?: string;
+  subject?: string;
+  referenceNumber?: string;
+  invoiceNumber?: string;
+  customerNumber?: string;
+  accountNumber?: string;
+  deadlineAt?: string;
+  paymentDueAt?: string;
+}
+
+function metadataRows(metadata: CapturedMetadata): Array<{ key: keyof CapturedMetadata; label: string; value: string }> {
+  return [
+    { key: 'sender', label: 'Sender', value: metadata.sender },
+    { key: 'recipient', label: 'Recipient', value: metadata.recipient },
+    { key: 'sentAt', label: 'Sent date', value: metadata.sentAt },
+    { key: 'subject', label: 'Subject', value: metadata.subject },
+    { key: 'referenceNumber', label: 'Reference number', value: metadata.referenceNumber },
+    { key: 'invoiceNumber', label: 'Invoice number', value: metadata.invoiceNumber },
+    { key: 'customerNumber', label: 'Customer number', value: metadata.customerNumber },
+    { key: 'accountNumber', label: 'Account number', value: metadata.accountNumber },
+    { key: 'deadlineAt', label: 'Deadline', value: metadata.deadlineAt },
+    { key: 'paymentDueAt', label: 'Payment due', value: metadata.paymentDueAt },
+  ].filter((row): row is { key: keyof CapturedMetadata; label: string; value: string } => Boolean(row.value));
 }
 
 function toDocumentTagOption(tag: { id: string; short: string; text: string; icon?: string }): DocumentTagOption {
