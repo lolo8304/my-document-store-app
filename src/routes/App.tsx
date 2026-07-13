@@ -776,7 +776,7 @@ export default function App() {
                         aria-label={`Edit sent date for ${title}`}
                         onClick={() => startSentDateEdit(item.documentId, item.sentAt, item.createdAt)}
                       >
-                        sent: {item.sentAt ? formatSentDate(item.sentAt) : '-'}
+                        sent: {formatSentLocationDate(item.sentLocation, item.sentAt) || '-'}
                       </button>
                     )}
                   </div>
@@ -901,7 +901,16 @@ function formatSentDate(value?: string) {
   if (!value) {
     return '';
   }
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(`${value}T00:00:00`));
+  const [year, month, day] = value.split('-');
+  return year && month && day ? `${day}.${month}.${year}` : value;
+}
+
+function formatSentLocationDate(location?: string, sentAt?: string) {
+  const formattedDate = formatSentDate(sentAt);
+  if (location && formattedDate) {
+    return `${location}, ${formattedDate}`;
+  }
+  return formattedDate || location || '';
 }
 
 function toDateInputValue(value?: string) {

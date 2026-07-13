@@ -28,6 +28,7 @@ export interface SearchResultItem {
   createdAt?: string;
   modifiedAt?: string;
   sentAt?: string;
+  sentLocation?: string;
   hasSentDate: boolean;
   sender?: string;
   recipient?: string;
@@ -58,6 +59,7 @@ export interface FullTextResult {
   fileName: string;
   tags: DocumentTag[];
   sentAt?: string;
+  sentLocation?: string;
   hasSentDate: boolean;
   sender?: string;
   recipient?: string;
@@ -255,8 +257,9 @@ export function getAdminStatus() {
   return apiFetch<AdminStatus>('/admin/status');
 }
 
-export function getDocumentText(id: string) {
-  return apiFetch<FullTextResult>(`/documents/${id}/text`);
+export function getDocumentText(id: string, cacheBust = false) {
+  const suffix = cacheBust ? `?refresh=${Date.now()}` : '';
+  return apiFetch<FullTextResult>(`/documents/${id}/text${suffix}`);
 }
 
 export function updateDocumentTitle(id: string, title: string) {
@@ -269,6 +272,28 @@ export function updateDocumentTags(id: string, tags: DocumentTag[]) {
 
 export function updateDocumentSentDate(id: string, sentAt: string | null) {
   return apiPatch<UpdateDocumentResult>(`/documents/${id}`, { sentAt });
+}
+
+export function clearDocumentMetadata(id: string) {
+  return apiPatch<UpdateDocumentResult>(`/documents/${id}`, { clearMetadata: true });
+}
+
+export function updateDocumentMetadata(id: string, metadata: Partial<CapturedDocumentMetadata>) {
+  return apiPatch<UpdateDocumentResult>(`/documents/${id}`, metadata);
+}
+
+export interface CapturedDocumentMetadata {
+  sender: string | null;
+  recipient: string | null;
+  sentAt: string | null;
+  sentLocation: string | null;
+  subject: string | null;
+  referenceNumber: string | null;
+  invoiceNumber: string | null;
+  customerNumber: string | null;
+  accountNumber: string | null;
+  deadlineAt: string | null;
+  paymentDueAt: string | null;
 }
 
 export function getDocumentTagDefinitions() {
@@ -325,6 +350,7 @@ async function apiDelete<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function getPdfLink(id: string) {
-  return apiFetch<{ documentId: string; pdfUrl: string }>(`/documents/${id}/pdf-link`);
+export function getPdfLink(id: string, cacheBust = false) {
+  const suffix = cacheBust ? `?refresh=${Date.now()}` : '';
+  return apiFetch<{ documentId: string; pdfUrl: string }>(`/documents/${id}/pdf-link${suffix}`);
 }
